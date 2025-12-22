@@ -1,0 +1,795 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 07
+**CH07A Finding a Good Deal among Hotels with Simple Regression**
+
+hotels-vienna  dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+from matplotlib.ticker import PercentFormatter
+import statsmodels.formula.api as smf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+ 
+# location folders
+data_in = dirname + "da_data_repo/hotels-vienna/clean/"
+data_out = dirname + "da_case_studies/ch03-hotels-vienna-explore/"
+output = dirname + "da_case_studies/ch03-hotels-vienna-explore/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# load vienna
+hotels = pd.read_csv(data_in + "hotels-vienna.csv")
+# hotels = pd.read_csv("https://osf.io/y6jvb/download")
+ 
+```
+
+### SAMPLE SELECTION
+
+Apply filters:  3-4 stars, Vienna actual, without  extreme value
+
+```{python}
+hotels = hotels.loc[
+    (hotels["accommodation_type"] == "Hotel")
+    & (hotels["city_actual"] == "Vienna")
+    & (hotels["stars"] >= 3)
+    & (hotels["stars"] <= 4)
+    & (hotels["stars"].notna())
+    & (hotels["price"] <= 600)
+]
+```
+
+```{python}
+# save a copy of the work file
+hotels.to_csv(data_out + "hotels_work.csv", index=False)
+```
+
+### Summary statistics on price and distance
+
+```{python}
+# Price
+hotels[["price"]].describe(percentiles=[0.50, 0.95])
+```
+
+```{python}
+# Distance
+hotels[["distance"]].describe(percentiles=[0.50, 0.95])
+```
+
+### REGRESSION 1: CLOSE VS FAR REGRESSION WITH BINARY DISTANCE
+
+```{python}
+hotels["dist2"] = hotels["distance"] >= 2
+```
+
+```{python}
+hotels["Eprice_cat2"] = hotels.groupby("dist2")["price"].transform("mean")
+```
+
+```{python}
+hotels["dist2"] = hotels["dist2"].replace(0, "Close")
+hotels["dist2"] = hotels["dist2"].replace(1, "Far")
+```
+
+```{python}
+hotels[["dist2", "distance", "price"]].groupby("dist2").aggregate("describe")
+```
+
+# Figure 7.1a
+# PLOT MEAN VALUES BY CLOSE VS FAR
+
+```{python}
+sns.scatterplot(
+    data=hotels,
+    x='dist2',
+    y='Eprice_cat2',
+    s=100,  
+    color=da.color[0],
+    alpha=0.4
+)
+
+
+for idx, row in hotels.iterrows():
+    plt.text(
+        row['dist2'] - 0.04, 
+        row['Eprice_cat2'] + 20,  
+        str(int(round(row['Eprice_cat2']))),  
+        color='black',
+        fontsize=12 
+    )
+
+plt.xlabel("Distance to city center (categories)", fontsize=12)
+plt.ylabel("Average price (US dollars)", fontsize=12)
+plt.xlim(-0.7, 1.7)
+plt.xticks([False, True], labels=["False", "True"])  
+plt.ylim(0, 410)
+plt.yticks(np.arange(0, 401, 50))
+
+
+plt.show()
+```
+
+```{python}
+#bellonda's version
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# 1. THE ARCHITECT STEP: Create a dedicated summary table
+# We only need one row per category (True/False).
+summary = hotels.groupby("dist2", as_index=False)["price"].mean()
+summary.rename(columns={"price": "avg_price"}, inplace=True)
+
+# Look at how clean this is:
+#    dist2   avg_price
+# 0  False   116.43
+# 1  True    89.72
+
+# 2. THE PLOT: Plot only the summary data (2 dots, not 200)
+sns.scatterplot(
+    data=summary,
+    x='dist2',
+    y='avg_price',
+    s=100,
+    color=da.color[0],
+    alpha=1.0  # No need for transparency since dots don't overlap anymore!
+)
+
+# 3. THE ANNOTATION: Loop over just 2 rows (Instant speed)
+# We use 'itertuples()' because it's faster than 'iterrows()', though for 2 rows it doesn't matter.
+for row in summary.itertuples():
+    plt.text(
+        x=row.dist2 - 0.04,
+        y=row.avg_price + 20,
+        s=f"{int(round(row.avg_price))}", # Cleaner f-string formatting
+        color='black',
+        fontsize=12
+    )
+
+# 4. THE STYLING (Standardized)
+plt.xlabel("Distance to city center (categories)", fontsize=12)
+plt.ylabel("Average price (US dollars)", fontsize=12)
+plt.xlim(-0.7, 1.7)
+plt.xticks([0, 1], labels=["Close (<2 miles)", "Far (>=2 miles)"]) # More descriptive labels
+plt.ylim(0, 410)
+plt.yticks(range(0, 401, 50)) # 'range' is cleaner than np.arange for integers
+
+plt.show()
+```
+
+```{python}
+hotels["dist4"] = hotels["distance"].apply(
+    lambda x: 0.5 + 1 * int(x >= 1) + 1 * int(x >= 2) + 2.5 * int(x >= 3)
+)
+hotels["Eprice_cat4"] = hotels.groupby("dist4")["price"].transform("mean")
+```
+
+```{python}
+hotels[["dist4", "distance", "price"]].groupby("dist4").aggregate("describe")
+```
+
+```{python}
+sns.scatterplot(
+    data=hotels,
+    x='dist4',
+    y='Eprice_cat4',
+    s=100,  
+    color=da.color[0],
+    alpha=0.4
+)
+
+
+for idx, row in hotels.iterrows():
+    plt.text(
+        row['dist4'] - 0.14, 
+        row['Eprice_cat4'] + 20,  
+        str(int(round(row['Eprice_cat4']))),  
+        color='black',
+        fontsize=12 
+    )
+
+plt.xlabel("Distance to city center (categories)", fontsize=12)
+plt.ylabel("Average price (US dollars)", fontsize=12)
+plt.xlim(-0.05, 7.05) 
+plt.ylim(0, 410)
+plt.yticks(np.arange(0, 401, 50))
+
+
+plt.show()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** To visually compare the distribution of Hotel Prices between two distinct groups (Near vs. Far) to identify premiums or discounts, combining statistical summaries with raw data density.
+
+**The Syntax Anatomy:**
+* `fig, ax = plt.subplots()` → **The Canvas** (Creating the empty space to draw on).
+* `sns.boxplot(..., showfliers=False, fill=False)` → **The Skeleton** (Draws the statistical boundaries: quartiles and median. We hide outliers here to avoid duplication).
+* `for i in range(...) ax.lines[i].set_color(...)` → **The Surgery** (Manually accessing the internal line objects of the plot to force specific custom branding colors).
+* `sns.stripplot(..., jitter=0.08)` → **The Evidence** (Overlays the actual data points so we can see the sample size and density distribution).
+
+> **💡 The Wisdom Check:**
+> When overlapping plots (Box + Strip), always turn `showfliers=False` on the boxplot. Otherwise, you will plot the extreme values twice (once as a box-outlier, once as a strip-point), which can mislead your viewer about the density of extreme values.
+
+```{python}
+fig, ax = plt.subplots()
+sns.boxplot(
+    data=hotels,
+    x='dist2',
+    y='price',
+    width=0.5,
+    showfliers=False,  
+    fill = False
+)
+
+for i in range(0,int(len(ax.lines)/2)):
+    ax.lines[i].set_color(da.color[0])
+
+for i in range(int(len(ax.lines)/2),len(ax.lines)):
+    ax.lines[i].set_color(da.color[1])
+
+sns.stripplot(
+    data=hotels,
+    x='dist2',
+    y='price',
+    palette=da.color,  
+    size=3,  
+    alpha=1,
+    jitter=0.08
+)
+
+plt.xlabel("Distance to city center (categories)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.ylim(0, 410)
+plt.yticks(np.arange(0, 401, 50))
+plt.xticks([0, 1], labels=["False", "True"])  
+plt.show()
+```
+
+
+## FIGURE 7.2a 7.2b
+
+```{python}
+sns.scatterplot(
+    data=hotels,
+    x='distance',
+    y='price',
+    color=da.color[0],
+    alpha=1,
+    s=25
+)
+
+# Customize axes
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+```{python}
+sns.scatterplot(
+    data=hotels,
+    x='distance',
+    y='price',
+    color=da.color[0],
+    alpha=1,
+    s=40
+)
+
+
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+plt.legend().remove()
+plt.show()
+```
+
+#### Scatterplot with step function (we use 1km bits for simpplicity using 4 bits for 3-7km)
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** To manually "bin" or discretize a continuous variable (Distance) into 1-mile chunks. This prepares the coordinates for plotting a "Step Function," where we visualize how price stays constant within a specific mile range.
+
+**The Syntax Anatomy:**
+* `hotels["dist4_s"]` → **The Start Coordinate** (The integer floor of the distance).
+* `.apply(lambda...` → **The Custom Binner** (We aren't using standard functions; we are manually stacking boolean conditions to force specific cut-offs).
+* `int(x >= 1)` → **The Boolean Switch** (Converts `True` to `1` and `False` to `0` to allow mathematical addition).
+* `hotels["xend"]` → **The End Coordinate** (Defines the width of the step, allowing us to draw a line from `dist4_s` to `dist4_s + 1`).
+
+> **💡 The Wisdom Check:**
+> This manual "Boolean Sum" method is verbose but gives you total control over your bins. It is often safer than `round()` or `floor()` when you need to enforce a specific "Max Cap" (e.g., stopping the count at 6 regardless of how far the actual distance goes).
+
+```{python}
+# hotels["dist4_s"] = hotels["distance"].apply(
+#     lambda x: 1 * int(x >= 1)
+#     + 1 * int(x >= 2)
+#     + 1 * int(x >= 3)
+#     + 1 * int(x >= 4)
+#     + 1 * int(x >= 5)
+#     + 1 * int(x >= 6)
+# )
+# hotels["xend"] = hotels["dist4_s"] + 1
+# hotels["yend"] = hotels["Eprice_cat4"]
+# hotels.head()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** To efficiently "bin" continuous distances into discrete integer categories for plotting, replacing slow line-by-line loops with high-speed vectorized operations.
+
+**The Syntax Anatomy:**
+* `np.floor(...)` → **The Binner** (Rounds every value down to the nearest integer, effectively grouping 3.0 to 3.99 into bucket "3").
+* `np.clip(..., 0, 6)` → **The Guard Rail** (Enforces business logic boundaries: anything below 0 becomes 0, anything above 6 stays at 6. This prevents extreme outliers from breaking the chart).
+* `.astype(int)` → **The Cleanup** (Converts floating point numbers like `3.0` to integers `3` for cleaner labels).
+
+> **💡 The Wisdom Check:**
+> Always prefer "Vectorized" functions (like `np.where`, `np.clip`, `np.floor`) over `.apply(lambda...)`. Vectorization uses optimized C-code under the hood, whereas `.apply` is just a loop in disguise. Your future self (and your server bill) will thank you.
+
+```{python}
+# The "Pandonic" Way: Vectorized Math
+# 1. Floor the distance (drop the decimals).
+# 2. Clip the result between 0 and 6 (to match your lambda's limit).
+# 3. Convert to integer.
+hotels["dist4_s"] = np.clip(np.floor(hotels["distance"]), 0, 6).astype(int)
+
+# These calculations are already efficient vector operations
+hotels["xend"] = hotels["dist4_s"] + 1
+hotels["yend"] = hotels["Eprice_cat4"]
+
+hotels.head()
+```
+
+```{python}
+hotels["xend"].value_counts()
+```
+
+```{python}
+hotels["yend"].value_counts()
+```
+
+```{python}
+hotels[["dist4_s","xend","yend"]]
+```
+
+```{python}
+sns.scatterplot(
+    data=hotels,
+    x='distance',
+    y='price',
+    color=da.color[0],
+    alpha=1,
+    s=25
+)
+for _, row in hotels.iterrows():
+    plt.plot([row["dist4_s"],row["xend"]],
+             [row["yend"],row["yend"]],linewidth = 1.5,color = da.color[1])
+# Customize axes
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+```{python}
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import seaborn as sns
+
+# 1. The Scatter (Raw Data) - Keep this as is
+sns.scatterplot(
+    data=hotels,
+    x='distance',
+    y='price',
+    color=da.color[0],  # Assuming 'da' is defined in your env
+    alpha=1,
+    s=25
+)
+
+# 2. The Efficient Line Plot (Deduplicated)
+# We isolate just the columns we need for drawing lines and drop duplicates.
+# This reduces N=1000+ rows to just N=7 rows (one per bin).
+segments = hotels[["dist4_s", "xend", "yend"]].drop_duplicates()
+
+plt.hlines(
+    y=segments["yend"], 
+    xmin=segments["dist4_s"], 
+    xmax=segments["xend"], 
+    colors=da.color[1], 
+    linewidth=1.5
+)
+
+# 3. Aesthetics
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+plt.legend().remove()
+
+plt.show()
+```
+
+```{python}
+# hotels["dist7_new"] = hotels["distance"].apply(
+#     lambda x: 0.5
+#     + 1 * int(x + 1 >= 1)
+#     + 1 * int(x + 1 >= 2)
+#     + 1 * int(x + 1 >= 3)
+#     + 1 * int(x + 1 >= 4)
+#     + 1 * int(x + 1 >= 5)
+#     + 1 * int(x + 1 >= 6)
+#     + 1 * int(x + 1 >= 7)
+# )
+```
+
+```{python}
+# The "Pandonic" Way
+# 1. Add 1 to distance (as per your logic).
+# 2. Floor it (drop decimals).
+# 3. Clip it (max value 7, min value 0).
+# 4. Add the 0.5 offset.
+
+hotels["dist7_new"] = np.clip(np.floor(hotels["distance"] + 1), 0, 7) + 0.5
+
+# Check the first few rows to confirm sanity
+hotels[["distance", "dist7_new"]].head()
+```
+
+```{python}
+hotels["Eprice_cat7_new"] = hotels.groupby("dist7_new")["price"].transform("mean")
+```
+
+```{python}
+hotels[["dist7_new", "distance", "price"]].groupby("dist7_new").aggregate("describe")
+```
+
+```{python}
+# Scatterplot with step function, starting point is simply at cut-off
+hotels["dist7_s"] = hotels.distance.apply(
+    lambda x: 1 * int(x >= 1)
+    + 1 * int(x >= 2)
+    + 1 * int(x >= 3)
+    + 1 * int(x >= 4)
+    + 1 * int(x >= 5)
+    + 1 * int(x >= 6)
+    + 1 * int(x >= 7)
+)
+hotels["xend"] = hotels["dist7_s"] + 1
+hotels["yend"] = hotels["Eprice_cat7_new"]
+```
+
+```{python}
+sns.scatterplot(
+    data=hotels,
+    x='distance',
+    y='price',
+    color=da.color[0],
+    alpha=1,
+    s=25
+)
+for _, row in hotels.iterrows():
+    plt.plot([row["dist7_s"],row["xend"]],
+             [row["yend"],row["yend"]],linewidth = 1.5,color = da.color[1])
+# Customize axes
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+# Figure 7.3
+### LOWESS NONPARAMETRIC REGRESSION
+
+```{python}
+sns.scatterplot(data=hotels, x="distance", y="price")
+da.plot_loess(data=hotels,x="distance",y="price",span=0.8,color=da.color[1])
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+```{python}
+### LINEAR REGRESSIONS
+regression = smf.ols(formula="price~distance", data=hotels).fit()
+regression.summary()
+#regression.summary(slim=True)
+```
+
+# Figure 7.5
+### SCATTERPLOT + REGRESSION LINE
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** To visualize the correlation (slope) between Distance and Price. We plot the raw data to show the variance ("the cloud") and overlay a Linear Regression fit ("the line") to show the average market trend.
+
+**The Syntax Anatomy:**
+* `sns.regplot(...)` → **The Model** (Calculates and draws a linear regression fit over a scatter plot).
+* `ci=False` → **The Clean-Up** (Removes the shaded Confidence Interval fan. Used when we want to focus solely on the *direction* of the slope, not the statistical variance around it).
+* `line_kws` / `scatter_kws` → **The Smugglers** (Dictionaries that pass specific styling instructions—like color and dot size—directly to the underlying Matplotlib engine).
+* `plt.xlim/ylim` → **The Frame** (Manually forcing the camera zoom logic. We add negative padding so data points on the axis lines aren't visually clipped).
+
+> **💡 The Wisdom Check:**
+> `sns.regplot` is an "Axes-level" function, meaning it draws onto the current active plot. This makes it easy to stack with other plots (like adding a vertical line for a cutoff), unlike "Figure-level" functions (like `lmplot`) which demand their own dedicated window.
+
+```{python}
+sns.regplot(data=hotels, x="distance", y="price",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 25))
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+### THE LINEAR REGRESSION GOES THROUGH THE AVERAGES
+### SCATTERPLOT + REGRESSION LINE + LINES FOR AVERAGES (NOT in BOOK)
+
+```{python}
+sns.regplot(data=hotels, x="distance", y="price",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 20))
+plt.plot([hotels["distance"].mean(),hotels["distance"].mean()],
+             [0,400],linewidth = 0.5,color = da.color[2],linestyle = 'dashed')
+
+plt.plot([0,7],
+             [hotels["price"].mean(),hotels["price"].mean()],linewidth = 0.5,color = da.color[2],linestyle = 'dashed')
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))  
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))  
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+### PREDICTED VALUES & RESIDUALS OF LINEAR REGRESSION 
+
+```{python}
+regression = smf.ols(formula="price~distance", data=hotels).fit()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** To capture the model's output for every individual observation. We calculate the "Theoretical Fair Price" for each hotel and the "Premium/Discount" (Residual) relative to that fair price.
+
+**The Syntax Anatomy:**
+* `regression.predict()` → **The Model's Opinion** (Calculates $\hat{y}$: what the price *should* be given the distance, based on the slope).
+* `regression.resid` → **The Reality Gap** (Calculates $e$: The `Actual Price` minus the `Predicted Price`).
+* `hotels[...] = ...` → **The Attachment** (Saves these statistical values directly into the main dataset so we can later find specific "undervalued" hotels).
+
+> **💡 The Wisdom Check:**
+> The Residual (`e`) is your most valuable metric for anomaly detection. A high residual means the model "failed" to predict that price—which usually means there is a hidden variable (like "Luxury Brand" or "Ocean View") that we haven't accounted for yet.
+
+```{python}
+hotels["predprice"] = regression.predict()
+hotels["e"] = regression.resid
+```
+
+### Figure 7.6, Table 7.1
+
+Pick one observation, with distance = 2.9, and label the residual on the scatter plot
+
+```{python}
+xa = 2.9 # distance
+```
+
+get annotation values from the dataframe
+
+```{python}
+ya = hotels.loc[hotels["distance"] == xa, "price"].values[0]
+ym = hotels.loc[hotels["distance"] == xa, "predprice"].values[0]
+```
+
+```{python}
+sns.regplot(
+    data=hotels,
+    x="distance",
+    y="price",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+
+plt.text(x=3.7, y=210, s="Residual", fontsize=10, color="black")
+
+plt.errorbar(
+    x=xa, y=ya, yerr=0, fmt="o", color=da.color[2], capsize=5, label="Pointrange"
+)
+sns.scatterplot(x=[xa], y=[ya], color=da.color[1], s=30, zorder=3)
+
+subset = hotels.loc[hotels["distance"].round(1) == xa]
+if not subset.empty:
+    plt.errorbar(
+        x=subset["distance"].values[0],
+        y=ya,
+        yerr=[[ya - ym], [0]],
+        fmt="o",
+        color=da.color[0],
+        capsize=5,
+        linewidth=0.5,
+    )
+
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))
+
+plt.legend().remove()
+
+
+plt.show()
+```
+
+```{python}
+sns.histplot(
+    data=hotels,
+    x="e",
+    binwidth=20,  
+    binrange=(-76,280),
+    color=da.color[0],
+    edgecolor="white",
+    stat="probability",  
+    alpha=1,
+)
+
+plt.xlabel("Residuals")
+plt.ylabel("Percent")
+plt.ylim(0, 0.31)
+plt.yticks(ticks=np.arange(0, 0.31, 0.05))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.xlim(-110, 310)
+plt.xticks(ticks=np.arange(-100, 301, 100))  
+plt.show()
+```
+
+```{python}
+hotels["reg1_res"] = ["overpriced" if e >= 0 else "underpriced" for e in hotels["e"]]
+```
+
+```{python}
+hotels.loc[hotels["e"].sort_values().tail().index, "reg1_res"] = "top5"
+hotels.loc[hotels["e"].sort_values().head().index, "reg1_res"] = "bottom5"
+```
+
+```{python}
+bestdeals = hotels.loc[hotels["e"].sort_values().head().index]
+```
+
+### Figure 7.7
+### adding annotation
+
+```{python}
+hotels.loc[hotels["reg1_res"] == "bottom5"][["distance","price"]]
+```
+
+```{python}
+sns.regplot(
+    data=hotels,
+    x="distance",
+    y="price",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+
+plt.annotate(
+    "Most underpriced hotels",
+    xy=(1.4, 50),
+    xytext=(2.2, 10),
+    arrowprops=dict(color="black", arrowstyle="->"),
+    fontsize=8,
+)
+
+sns.scatterplot(
+    hotels.loc[hotels["reg1_res"] == "bottom5"],
+    x="distance",
+    y="price",
+    color=da.color[3],
+    s=15,
+    zorder=3,
+)
+
+
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 8, 1))
+plt.ylim(-10, 405)
+plt.yticks(np.arange(0, 401, 50))
+plt.show()
+```
+
+### Table 7.1
+
+```{python}
+(
+    hotels.loc[
+        hotels["reg1_res"] == "bottom5",
+        ["hotel_id", "distance", "price", "predprice", "e"],
+    ]
+    .sort_values(by=["e"])
+    .round(2)
+    .reset_index(drop=True)
+    .rename({"e": "residual"}, axis=1)
+)
+```
+
+

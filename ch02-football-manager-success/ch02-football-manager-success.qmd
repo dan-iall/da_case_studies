@@ -1,0 +1,194 @@
+---
+title: Chapter 02
+jupyter: python3
+---
+
+**CH02B Identifying successful football managers**
+
+using the football dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/football/clean/"
+data_out = dirname + "da_case_studies/ch02-football-manager-success/"
+output = dirname + "da_case_studies/ch02-football-manager-success/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+epl_games = pd.read_csv(data_in + "epl_games.csv")
+```
+
+```{python}
+epl_games.sort_values(["team_home"])
+```
+
+```{python}
+# Sort by 'col1' first, then break ties with 'col2'
+epl_games.sort_values(["season", "team_home"])
+```
+c
+```{python}
+epl_games.loc[epl_games["season"] == 2016]
+```
+
+```{python}
+# look at data for team-game level
+epl_teams_games = pd.read_csv(data_in + "epl-teams-games.csv")
+```
+
+```{python}
+epl_teams_games.sort_values(["team"])
+```
+
+```{python}
+epl_teams_games.sort_values(["season", "team"])
+```
+
+```{python}
+epl_teams_games.loc[epl_teams_games["season"] == 2016]
+```
+
+```{python}
+football_managers = pd.read_csv(data_in + "football_managers.csv")
+football_managers
+```
+
+```{python}
+# finally the merged file
+
+football_managers_merged = pd.read_csv(
+    data_in + "football_managers_workfile.csv"
+).sort_values(["season", "team"])
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** We are creating the fundamental metrics for "Managerial Success"—specifically **Longevity** (Games Managed) and **Performance** (Points Earned).
+
+**The Syntax Anatomy:**
+* `football_managers_merged` → **The Source** (Our raw game-level data)
+* `.groupby(["team", "..."])` → **The Buckets** (We are slicing the data to look at one specific manager's tenure at one specific team)
+* `.agg(...)` → **The Calculation** (Collapsing those game rows into a single summary number)
+    * `("div", "size")` → Count the rows to get **Total Games**.
+    * `("points", "sum")` → Add the values to get **Total Points**.
+
+> **💡 The Wisdom Check:**
+> We group by `team` AND `manager_id` because a manager might manage multiple teams, or return to the same team later. We must treat each tenure as a unique "case study" of success or failure.
+
+```{python}
+games = football_managers_merged.groupby(['team', 'manager_id', 'manager_name']).agg(
+    manager_games=('div', 'size')
+)
+points = football_managers_merged.groupby(['team', 'manager_id', 'manager_name']).agg(
+    manager_points=('points', 'sum')
+)
+```
+
+```{python}
+# default join is by indices which is multiindex group key this time --> No need to manually define keys
+win_ratio = games.join(points)
+win_ratio["manager_win_ratio"] = (
+    win_ratio["manager_points"] / win_ratio["manager_games"]
+)
+win_ratio = win_ratio.sort_values(["manager_win_ratio"], ascending=False)
+```
+
+```{python}
+top_managers = win_ratio.sort_values(by=["manager_win_ratio"], ascending=False).head(11)
+top_managers
+```
+
+### Figure 2.1 The most successful managers
+
+```{python}
+# denote caretakers
+top_managers["manager_win_ratio0"] = [
+    row["manager_win_ratio"] if row["manager_games"] < 18 else np.nan
+    for index, row in top_managers.iterrows()
+]
+top_managers["manager_win_ratio1"] = [
+    row["manager_win_ratio"] if row["manager_games"] > 18 else np.nan
+    for index, row in top_managers.iterrows()
+]
+```
+
+```{python}
+import numpy as np
+
+# Create the Caretaker column (< 18 games)
+top_managers["manager_win_ratio0"] = np.where(
+    top_managers["manager_games"] < 18,     # The Condition
+    top_managers["manager_win_ratio"],      # If True (Keep the ratio)
+    np.nan                                  # If False (Null it out)
+)
+
+# Create the Long-term column (> 18 games)
+top_managers["manager_win_ratio1"] = np.where(
+    top_managers["manager_games"] > 18, 
+    top_managers["manager_win_ratio"], 
+    np.nan
+)
+```
+
+```{python}
+# denote caretakers
+top_managers["fill"] = [
+    1 if row["manager_games"] < 18 else 0 for index, row in top_managers.iterrows()
+]
+```
+
+```{python}
+top_managers=top_managers.sort_values(["manager_win_ratio"]).reset_index()
+top_managers
+```
+
+```{python}
+palette = [da.color[3] if x == 1 else da.color[0] for x in top_managers['fill']]
+sns.barplot(
+    x='manager_win_ratio',
+    y='manager_name',
+    data=top_managers,
+    palette=palette,
+    ci=None,
+)
+plt.xlabel("Average points per game")
+plt.ylabel("Manager name")
+plt.xlim(0, 3.1)
+plt.xticks(ticks=np.arange(0, 3.1, 0.3))
+plt.gca().invert_yaxis()
+
+plt.show()
+```
+
+```{python}
+# In the book the last 3 managers are in a different order, but since all three's point average is 2.0, it is not a meaningful difference
+```
+

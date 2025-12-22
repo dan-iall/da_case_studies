@@ -1,0 +1,426 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 08
+**CH08B How is life expectancy related to the average income of a country?**
+
+using the worldbank-lifeexpectancy dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import statsmodels.formula.api as smf
+from matplotlib.ticker import PercentFormatter
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/worldbank-lifeexpectancy/clean/"
+data_out = dirname + "da_case_studies/ch08-life-expectancy-income/"
+output = dirname + "da_case_studies/ch08-life-expectancy-income/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+Read clean data
+
+```{python}
+xc = pd.read_csv(data_in + "worldbank-lifeexpectancy.csv")
+#xc = pd.read_csv("https://osf.io/download/sh9mu/")
+```
+
+```{python}
+xc
+```
+
+select year
+
+### 🕵️‍♀️ Bellonda's Syntax Codex: Filtering Methods
+
+| Method | Syntax | Best Use Case |
+| :--- | :--- | :--- |
+| **Boolean** | `df[df.A > 5]` | Simple, isolated filtering. IDE support needed. |
+| **Lambda** | `.loc[lambda x: x.A > 5]` | **Production Code.** Pipelines. Renaming-safe. |
+| **Query** | `.query("A > 5")` | **Exploration.** Complex logic. Large datasets. |
+
+**Architect's Choice for this Notebook:** Stick with **Lambda** or **Boolean** to ensure column names are validated by Python.
+
+```{python}
+xc = xc.loc[lambda x: x["year"] == 2017]
+```
+
+ GDP total, log
+
+```{python}
+xc["gdptot"] = xc["gdppc"] * xc["population"]
+xc["lngdppc"] = np.log(xc["gdppc"])
+xc["lngdptot"] = np.log(xc["gdptot"])
+```
+
+```{python}
+# The : means "All Observations" (every row (country))
+xc.loc[:, ["lifeexp", "gdppc", "gdptot", "lngdppc", "lngdptot"]].describe()
+```
+
+### Figure 8.3 The distribution of GDP per capita
+
+(a) Histogram of GDP per capita
+
+```{python}
+sns.histplot(
+    xc['gdppc'], 
+    binwidth=3, 
+    binrange=(0, 120),  
+    color=da.color[0], 
+    stat="probability",
+    alpha=1
+)
+
+
+plt.xlabel("GDP per capita (thousand US dollars)", fontsize=12)
+plt.ylabel("Percent", fontsize=12)
+plt.xlim(-1, 121)
+plt.xticks(np.arange(0, 121, 20))
+plt.ylim(0, 0.2)
+plt.yticks(ticks=np.arange(0, 0.21, 0.04))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+
+plt.show()
+```
+
+(b) Histogram of ln(GDP per capita)
+
+```{python}
+sns.histplot(
+    xc['lngdppc'], 
+    binwidth=0.15, 
+    binrange=(0, 4.8),  
+    color=da.color[0], 
+    stat="probability",
+    alpha=1
+)
+
+
+plt.xlabel("GDP per capita (thousand US dollars)", fontsize=12)
+plt.ylabel("Percent", fontsize=12)
+plt.xlim(-0.01, 5.1)
+plt.xticks(np.arange(0, 5.1, 0.5))
+plt.ylim(0, 0.1)
+plt.yticks(ticks=np.arange(0, 0.11, 0.02))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+
+plt.show()
+```
+
+ LEVEL-LEVEL REGRESSION
+
+```{python}
+reg3 = smf.ols(formula="lifeexp ~ gdppc", data=xc)
+reg3.fit().summary()
+```
+
+### Figure 8.4 Life expectancy and GDP per capita
+
+```{python}
+sns.regplot(data=xc, x="gdppc", y="lifeexp",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 20))
+
+plt.xlabel("GDP per capita (thousand US dollars)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+plt.xlim(-1, 121)
+plt.xticks(np.arange(0, 121, 20))  
+plt.ylim(49, 101)
+plt.yticks(np.arange(50, 101, 5))  
+
+
+plt.show()
+```
+
+LOG GDP PER CAPITA
+
+```{python}
+reg4 = smf.ols(formula="lifeexp ~ lngdppc", data=xc)
+reg4.fit().summary()
+```
+
+### Figure 8.5 Life expectancy and GDP per capita
+
+(a) Life expectancy and ln(GDP per capita)
+
+```{python}
+sns.regplot(data=xc, x="lngdppc", y="lifeexp",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 20))
+
+plt.xlabel("ln(GDP per capita, thousand US dollars)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+plt.xlim(-0.7, 5.1)
+plt.xticks(np.arange(-0.5, 5, 0.5))  
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))  
+
+
+plt.show()
+```
+
+(b) Life expectancy and ln(GDP per capita),
+(labels are thousand dollars)
+
+```{python}
+sns.regplot(data=xc, x="lngdppc", y="lifeexp",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 15))
+
+plt.xlabel("GDP per capita, thousand US dollars (ln scale)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+xticks = [0, 0.7, 1.6, 2.3, 3, 3.9, 4.6]
+xlabels = ["1", "2", "5", "10", "20", "50", "100"]
+plt.xticks(ticks=xticks,labels=xlabels)
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))  
+plt.show()
+```
+
+### TOTAL GDP
+
+Level-level regression
+
+```{python}
+reg1 = smf.ols(formula="lifeexp ~ gdppc", data=xc)
+reg1.fit().summary()
+```
+
+### Figure 8.6 Life expectancy and total GDP
+
+(a) Life expectancy and total GDP
+
+```{python}
+sns.regplot(data=xc, x="gdptot", y="lifeexp",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 20))
+
+plt.xlabel("Total GDP  (billion US dollars)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+plt.xlim(-200, 24200)
+plt.xticks(np.arange(0, 24001, 4000))  
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))  
+
+
+plt.show()
+```
+
+```{python}
+reg2 = smf.ols(formula="lifeexp ~ lngdptot", data=xc)
+reg2.fit().summary()
+```
+
+(b) Life expectancy and ln total GDP
+
+```{python}
+sns.regplot(
+    data=xc,
+    x="lngdptot",
+    y="lifeexp",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=15),
+)
+plt.xlabel("GDP per capita, thousand US dollars (ln scale)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+xlabels = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 10000]
+xticks = np.log(xlabels)
+plt.xticks(ticks=xticks, labels=xlabels)
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))
+plt.show()
+```
+
+### GDP PER CAPITA PIECEWISE LINEAR SPLINE
+
+```{python}
+cutoff = 50
+cutoff_ln = np.log(cutoff)
+```
+
+```{python}
+reg5 = smf.ols(formula="lifeexp ~ da.lspline(lngdppc,[cutoff_ln])", data=xc)
+reg5.fit().summary()
+```
+
+```{python}
+xc["e3"] = reg5.fit().resid
+xc["sppred"] = reg5.fit().predict()
+```
+
+### Figure 8.7 Life expectancy and GDP per capita: scatterplot and nonlinear regression
+
+(a) Piecewise linear spline
+
+```{python}
+sns.scatterplot(
+    data=xc,
+    x="lngdppc",
+    y="lifeexp",
+    color=da.color[0],
+    size=10
+)
+
+sns.lineplot(
+    data=xc,
+    x="lngdppc",
+    y="sppred",
+    color=da.color[1],
+    linewidth=1.5
+)
+
+plt.axvline(
+    x=np.log(cutoff),
+    color=da.color[2],
+    linewidth=1.5,
+    linestyle="dotted"
+)
+plt.xlabel("GDP per capita, thousand US dollars (ln scale)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+xlabels = [1, 2, 5, 10, 20, 50, 100]
+xticks = np.log(xlabels)
+plt.xticks(ticks=xticks,labels=xlabels)
+plt.legend().remove()
+plt.show()
+```
+
+### QUADRATIC IN LEVEL-LOG REGRESSION
+
+```{python}
+xc["lngdppc_sq"] = xc["lngdppc"].pow(2)
+reg6 = smf.ols(formula="lifeexp ~ lngdppc+lngdppc_sq", data=xc)
+reg6.fit().summary()
+```
+
+```{python}
+xc["e6"] = reg6.fit().resid
+```
+
+(b) Quadratic function
+
+```{python}
+sns.regplot(
+    data=xc,
+    x="lngdppc",
+    y="lifeexp",
+    ci=False,
+    order=2,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=15),
+)
+
+plt.xlabel("GDP per capita, thousand US dollars (ln scale)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+xlabels = [1, 2, 5, 10, 20, 50, 100]
+xticks = np.log(xlabels)
+plt.xticks(ticks=xticks, labels=xlabels)
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))
+plt.show()
+```
+
+### WEIGHTED AND UNWEIGHTED REGRESSION
+
+```{python}
+reg7 = smf.ols(formula="lifeexp ~ lngdppc", data=xc)
+reg7.fit().summary()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Population-Weighted Regression
+**The Syntax Anatomy:**
+* `smf.wls` (**The Builder**) $\to$ `(.fit)` (**The Solver**) $\to$ `(.summary)` (**The Report**)
+* `weights=xc.population`: CRITICAL. Shifts analysis from "Country-Level" to "Person-Level."
+
+**Data Flow:** `(Countries)` $\xrightarrow{Weights}$ `(Global Citizens)`
+**Student Note:** Matches the logic of "Analytic Weights" in Stata. We strictly down-weight small countries to capture the true global elasticity.
+
+```{python}
+reg7 = smf.wls(formula="lifeexp ~ lngdppc", data=xc, weights=xc.population)
+reg7.fit().summary()
+```
+
+### Figure 8.9 Life expectancy and log GDP per capita: unweighted and weighted regressions
+
+(a) Unweighted
+
+```{python}
+sns.regplot(data=xc, x="lngdppc", y="lifeexp",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 15))
+
+plt.xlabel("GDP per capita, thousand US dollars (ln scale)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+xticks = [0, 0.7, 1.6, 2.3, 3, 3.9, 4.6]
+xlabels = ["1", "2", "5", "10", "20", "50", "100"]
+plt.xticks(ticks=xticks,labels=xlabels)
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))  
+plt.show()
+```
+
+(b) Weighted
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Population-Weighted Visualization
+**The Syntax Anatomy:**
+* `scatter_kws` (**The Modifier**) $\to$ `s=Vector` (**Geometry Broadcast**)
+* `plt.xticks` (**The Mapper**) $\to$ Maps $Log(X)$ positions to $Level(X)$ labels.
+
+**Data Flow:** `(N_Countries)` $\to$ `(N_Points, Size_Vector)`
+**Student Note:** The *size* (`s`) of the dot tells the story of human impact, but the *regression line* still tells the story of political boundaries (unweighted). Don't confuse the two!
+
+```{python}
+sns.regplot(
+    data=xc,
+    x="lngdppc",
+    y="lifeexp",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=0.8, s=xc["population"] * 3),
+)
+
+plt.text(4.2, 80, "USA", fontsize=10)
+plt.text(2.2, 82, "China", fontsize=10)
+plt.text(1.8, 63, "India", fontsize=10)
+
+plt.xlabel("GDP per capita, thousand US dollars (ln scale)", fontsize=12)
+plt.ylabel("Life expectancy  (years)", fontsize=12)
+xlabels = [1, 2, 5, 10, 20, 50, 100]
+xticks = np.log(xlabels)
+plt.xticks(ticks=xticks, labels=xlabels)
+plt.ylim(49, 86)
+plt.yticks(np.arange(50, 86, 5))
+plt.show()
+```
+
+

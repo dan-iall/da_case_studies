@@ -1,0 +1,816 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 11
+**CH11A Does Smoking Pose a Health Risk?**
+
+using the share-health dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+import pyfixest as pf
+import numpy as np
+import pandas as pd
+from scipy.stats import logistic
+from scipy.stats import norm
+from stargazer.stargazer import Stargazer
+from patsy import dmatrices
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
+from sklearn.metrics import log_loss
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+current_path = os.getcwd()
+base_dir = current_path.split("da_case_studies")[0]
+data_in = os.path.join(str(base_dir), "da_data_repo/share-health/clean/")
+data_out = os.path.join(str(base_dir), "da_case_studies/ch11-smoking-health-risk/")
+output = os.path.join(str(base_dir), "da_case_studies/ch12-stock-returns-risk/output/")
+func = os.path.join(str(base_dir), "da_case_studies/ch00-tech-prep/")
+```
+
+```{python}
+sys.path.append(func)
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+#share = pd.read_csv(os.path.join(data_in, "share-health.csv"))
+share = pd.read_csv("https://osf.io/download/kbjzp/")
+```
+
+# Part I – create workfile
+
+```{python}
+share["healthy"] = 0
+share.loc[(share["sphus"] == 1) | (share["sphus"] == 2), "healthy"] = 1
+share.loc[~((share["sphus"] > 0) & (share["sphus"] <= 5)), "healthy"] = np.nan
+```
+
+```{python}
+share["healthy"].value_counts()
+```
+
+```{python}
+share = share.dropna(how="any")
+```
+
+```{python}
+share["baseline"] = 0
+share.loc[share["wave"] == 4, "baseline"] = 1
+share["endline"] = 0
+share.loc[share["wave"] == 6, "endline"] = 1
+```
+
+```{python}
+share["baseline"].value_counts()
+```
+
+```{python}
+share["endline"].value_counts()
+```
+
+```{python}
+share["temp"] = np.where(
+    share["endline"] == 1, np.where(share["healthy"] == 1, 1, 0), np.nan
+)
+```
+
+```{python}
+share["temp"].value_counts()
+```
+
+```{python}
+share["stayshealthy"] = share.groupby("mergeid")["temp"].transform(np.nanmax)
+```
+
+```{python}
+share["stayshealthy"].value_counts()
+```
+
+```{python}
+share = share.drop("temp", axis=1)
+```
+
+```{python}
+# keep if endline health outcome non-missing
+share = share.loc[lambda x: (x["stayshealthy"] == 1) | (x["stayshealthy"] == 0)]
+```
+
+```{python}
+# keep baseline observations (endline outcome already defined for them)
+share = share.loc[lambda x: x["baseline"] == 1]
+```
+
+```{python}
+# keep age 50-60 at baseline
+share = share.loc[lambda x: (x["age"] >= 50) & (x["age"] <= 60)]
+```
+
+```{python}
+# keep healthy individuals at baseline
+share = share.loc[lambda x: x["healthy"] == 1]
+```
+
+```{python}
+# keep those with non-missing observations for smoking at baseline
+# and re-define smoking to be 0-1
+share.loc[lambda x: x["smoking"] == 5, "smoking"] = 0
+share = share.loc[lambda x: (x["smoking"] == 0) | (x["smoking"] == 1)]
+
+share.loc[lambda x: x["ever_smoked"] == 5, "ever_smoked"] = 0
+share = share.loc[lambda x: (x["ever_smoked"] == 0) | (x["ever_smoked"] == 1)]
+```
+
+```{python}
+share["exerc"] = np.where(
+    share["br015"] == 1,
+    1,
+    np.where((share["br015"] > 0) & (share["br015"] != 1), 0, np.nan),
+)
+share["exerc"].value_counts()
+```
+
+```{python}
+share["bmi"] = np.where(share["bmi"] < 0, np.nan, share["bmi"])
+
+share["bmi"].describe().round(2)
+```
+
+```{python}
+share = share.rename(columns={"income_pct_w4": "income10"})
+```
+
+```{python}
+share["married"] = np.where((share["mar_stat"] == 1) | (share["mar_stat"] == 2), 1, 0)
+```
+
+```{python}
+share["eduyears"] = np.where(share["eduyears_mod"] < 0, np.nan, share["eduyears_mod"])
+
+share["eduyears"].describe().round(2)
+```
+
+```{python}
+share = share.drop("eduyears_mod", axis=1)
+```
+
+```{python}
+share = share.loc[
+    lambda x: (x["bmi"].notnull()) & (x["eduyears"].notnull()) & (x["exerc"].notnull())
+]
+```
+
+```{python}
+share.filter(
+    [
+        "stayshealthy",
+        "smoking",
+        "ever_smoked",
+        "female",
+        "age",
+        "income10",
+        "eduyears",
+        "bmi",
+        "exerc",
+    ]
+).describe().round(2)
+```
+
+```{python}
+pd.crosstab(share["country"], share["stayshealthy"])
+```
+
+```{python}
+share.reset_index(drop=True).to_csv("ch11_share.csv")
+```
+
+#  2. PART - SIMPLE LPM MODELS
+
+```{python}
+share = pd.read_csv("ch11_share.csv", index_col=0)
+```
+
+```{python}
+share.head()
+```
+
+### Table 11.1 Probability of staying healthy
+
+```{python}
+lpm1 = pf.feols("stayshealthy ~ smoking", data=share,vcov="HC1")
+lpm2 = pf.feols("stayshealthy ~ smoking + ever_smoked", data=share,vcov="HC1")
+```
+
+```{python}
+pf.etable([lpm1,lpm2],
+          labels={"Intercept": "Constant"})
+```
+
+```{python}
+share["pred1"] = lpm1.predict()
+
+pd.crosstab(index=share["pred1"], columns=share["smoking"])
+```
+
+```{python}
+pd.crosstab(index=share["stayshealthy"], columns=share["smoking"])
+```
+
+```{python}
+share["weight"] = share.groupby(["smoking", "stayshealthy"])["smoking"].transform(len)
+share["weight_2"] = share["weight"] / 1000
+```
+
+### Figure 11.1 Staying healthy and smoking – scatterplot and regression line
+
+```{python}
+sns.scatterplot(data=share, x="smoking", y="pred1", s=15, label="Predicted Probability",legend=False)
+sns.lineplot(data=share, x="smoking", y="pred1", linewidth=1.5,legend=False)
+sns.scatterplot(
+    data=share, 
+    x="smoking", 
+    y="stayshealthy", 
+    size="weight_2", 
+    sizes=(50,200),
+    hue=None, 
+    alpha=1, 
+    color=da.color[1], 
+    legend=False
+)
+plt.xticks([0, 1])
+plt.yticks(ticks=np.arange(0, 1.1, 0.1))
+plt.xlabel("Current smoker")
+plt.ylabel("Staying healthy / Predicted probability")
+plt.show()
+```
+
+```{python}
+share["weight"] = (
+    share.groupby(["eduyears", "stayshealthy"])["smoking"].transform(len) / 100
+)
+```
+
+### Figure 11.2 Education, income, and the probability of staying healthy – non-parametric regressions
+
+(a) Staying healthy and years of education
+
+```{python}
+da.plot_loess(data=share,x="eduyears",y="stayshealthy",span=0.8,color=da.color[0])
+plt.xlim(-0.3,24.3)
+plt.ylim(0,1.01)
+plt.xticks(ticks=np.arange(0, 25, 4))
+plt.yticks(ticks=np.arange(0, 1.1, 0.1))
+plt.xlabel("Years of education")
+plt.ylabel("Probability of staying healthy")
+plt.show()
+```
+
+(b) Staying healthy and income group
+
+```{python}
+da.plot_loess(data=share,x="income10",y="stayshealthy",span=0.8,color=da.color[0])
+plt.xlim(0.8,10.2)
+plt.ylim(0,1.01)
+plt.xticks(ticks=np.arange(2, 11, 2))
+plt.yticks(ticks=np.arange(0, 1.1, 0.1))
+plt.xlabel("Income group within country (deciles)")
+plt.ylabel("Probability of staying healthy")
+plt.show()
+```
+
+Not in the book
+
+```{python}
+da.plot_loess(data=share,x="age",y="stayshealthy",span=0.8,color=da.color[0])
+plt.xlim(49.5,60.5)
+plt.ylim(0,1.01)
+plt.xticks(ticks=np.arange(50, 61, 2.5))
+plt.yticks(ticks=np.arange(0, 1.1, 0.1))
+plt.xlabel("Age at interview (years)")
+plt.ylabel("Probability of staying healthy")
+plt.show()
+```
+
+Not in the book
+
+```{python}
+da.plot_loess(data=share,x="bmi",y="stayshealthy",span=0.8,color=da.color[0])
+plt.xlim(9,51)
+plt.ylim(0,1.01)
+plt.xticks(ticks=np.arange(10, 51, 10))
+plt.yticks(ticks=np.arange(0, 1.1, 0.1))
+plt.xlabel("Body mass index")
+plt.ylabel("Probability of staying healthy")
+plt.show()
+```
+
+# 3. PART - PROBABILITY MODELS (LPM, LOGIT, PROBIT) & PREDICTION
+
+```{python}
+share["country"] = share["country"].astype("category")
+```
+
+```{python}
+from py_helper_functions import lspline
+```
+
+### Table 11.2 Smoking and the probability of staying healthy – rich LPM
+
+```{python}
+lpm3 = pf.feols("stayshealthy ~ smoking + ever_smoked + female + age + lspline(eduyears,[8,18]) + income10 + lspline(bmi,[35]) + exerc + country",
+    share,
+    vcov="HC1",
+    context=0)
+```
+
+```{python}
+# Hide country coefficients
+pf.etable(lpm3,
+          drop=r"^c")
+```
+
+```{python}
+share["pred_lpm"] = lpm3.predict()
+share["pred_lpm"].describe().round(4)
+```
+
+### Figure 11.3 Histogram of the predicted probabilities
+
+```{python}
+sns.histplot(
+    data=share,
+    x="pred_lpm",
+    binwidth=0.02,  
+    binrange=(0,1),
+    color=da.color[0],
+    edgecolor="white",
+    stat="probability",  
+    alpha=1,
+)
+
+plt.xlabel("Predicted probability of staying healthy (LPM)")
+plt.ylabel("Percent")
+plt.ylim(0, 0.07)
+plt.yticks(ticks=np.arange(0, 0.07, 0.01))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.xlim(-0.06,1.06)
+plt.xticks(ticks=np.arange(0, 1.1, 0.2))  
+plt.show()
+```
+
+```{python}
+cuts = 100
+share["q100_pred_lpm"] = pd.qcut(share["pred_lpm"], q=cuts, labels=range(1, cuts + 1))
+```
+
+```{python}
+share.loc[
+    share["q100_pred_lpm"] == 1,
+    ["smoking", "ever_smoked", "female", "age", "eduyears", "income10", "bmi", "exerc"],
+].describe().round(1)
+
+# Bottom 1%
+```
+
+```{python}
+share.loc[
+    share["q100_pred_lpm"] == 100,
+    ["smoking", "ever_smoked", "female", "age", "eduyears", "income10", "bmi", "exerc"],
+].describe().round(1)
+
+# Top 1%
+```
+
+# 4. PART - LOGIT VS. PROBIT MODELS
+
+Logit and Probit are implemented in Pyfixest, however the marginal effects can not be accurately calculated due to a compatibility issue of the "marginaleffects" package with other packages
+
+```{python}
+y, X = dmatrices(
+    "stayshealthy ~ smoking + ever_smoked + female + age + lspline(eduyears,[8,18]) + \
+                 income10 + lspline(bmi,[35]) + exerc + country",
+    share,
+)
+
+logit = sm.GLM(y, X, family=sm.families.Binomial(link=sm.genmod.families.links.logit()))
+logit = logit.fit()
+```
+
+```{python}
+logit.summary()
+```
+
+```{python}
+share["pred_logit"] = logit.predict()
+```
+
+```{python}
+share["pred_logit"].describe()
+```
+
+```{python}
+logit = sm.Logit(y, X)
+```
+
+```{python}
+logit_result = logit.fit()
+```
+
+```{python}
+logit_result.summary()
+```
+
+```{python}
+logit_margef_results = logit_result.get_margeff()
+```
+
+```{python}
+logit_margef_results.summary()
+```
+
+```{python}
+probit = sm.Probit(y, X)
+```
+
+```{python}
+probit_result = probit.fit()
+```
+
+```{python}
+probit_result.summary()
+```
+
+```{python}
+share["pred_probit"] = probit_result.predict()
+```
+
+```{python}
+share["pred_probit"].describe()
+```
+
+```{python}
+probit_margef_results = probit_result.get_margeff()
+```
+
+```{python}
+probit_margef_results.summary()
+```
+
+```{python}
+df_plot = pd.melt(
+    share[["pred_lpm", "pred_logit", "pred_probit"]].rename(
+        columns={"pred_logit": "Logit", "pred_probit": "Probit"}
+    ),
+    value_vars=["Logit", "Probit"],
+    id_vars=["pred_lpm"],
+).sort_values(by=["variable"], ascending=False)
+```
+
+### Figure 11.5 Predicted probabilities from three different models
+
+```{python}
+sns.scatterplot(
+    data=df_plot, 
+    x="pred_lpm", 
+    y="value", 
+    hue="variable", 
+    palette=[da.color[1], da.color[0]], 
+    s=10
+)
+plt.plot([0, 1], [0, 1], color=da.color[2], linewidth=1, label="_nolegend_")
+
+plt.xlabel("Predicted probability of staying healthy (LPM)")
+plt.ylabel("Predicted probability")
+
+plt.legend(
+    title=None, 
+    loc="lower left", 
+    bbox_to_anchor=(0.5, 0.1), 
+    #frameon=False,  
+    ncol=1 
+)
+plt.xlim(0,1)
+plt.ylim(0,1)
+plt.xticks(ticks=np.arange(0,1.1,0.1))
+plt.yticks(ticks=np.arange(0,1.1,0.1))
+plt.show()
+```
+
+# Part 5 goodness of fit
+
+```{python}
+lpmbase = smf.ols("stayshealthy ~ smoking", data=share).fit()
+```
+
+```{python}
+share["pred_lpmbase"] = lpmbase.predict()
+```
+
+### Figure 11.7 Staying healthy and the distribution of the predicted probability of staying healthy. Two linear probability model
+
+(a) Simple LPM
+
+```{python}
+sns.histplot(
+    data=share[share["stayshealthy"] == 1],
+    x="pred_lpmbase",
+    stat="percent", 
+    binwidth=0.05,
+    binrange=(0,1),
+    alpha=1
+)
+
+sns.histplot(
+    data=share[share["stayshealthy"] == 0],
+    x="pred_lpmbase",
+    stat="percent",
+    binwidth=0.05,
+    binrange=(0,1),
+    color=da.color[1],
+    edgecolor=da.color[1],
+    fill=False  
+)
+
+plt.ylabel("Percent")
+plt.xlabel("Fitted values")
+plt.xlim(-0.05, 1.05)
+plt.ylim(0, 80)
+plt.xticks(ticks=np.arange(0,1.1,0.2))  
+plt.yticks(ticks=np.arange(0,81,20))
+plt.show()
+```
+
+(b) Rich LPM
+
+```{python}
+sns.histplot(
+    data=share[share["stayshealthy"] == 1],
+    x="pred_lpm",
+    stat="percent", 
+    binwidth=0.05,
+    binrange=(0,1),
+    alpha=1
+)
+
+sns.histplot(
+    data=share[share["stayshealthy"] == 0],
+    x="pred_lpm",
+    stat="percent",
+    binwidth=0.05,
+    binrange=(0,1),
+    color=da.color[1],
+    edgecolor=da.color[1],
+    fill=False  
+)
+
+plt.ylabel("Percent")
+plt.xlabel("Fitted values")
+plt.xlim(-0.05, 1.05)
+plt.ylim(0, 20)
+plt.xticks(ticks=np.arange(0,1.1,0.2))  
+plt.yticks(ticks=np.arange(0,21,4))
+plt.show()
+```
+
+#### Table 11.4 Comparing probability models – mean and median
+
+```{python}
+share.groupby("stayshealthy")[
+    ["pred_lpmbase", "pred_lpm", "pred_logit", "pred_probit"]
+].mean().round(3)
+```
+
+```{python}
+share.groupby("stayshealthy")[
+    ["pred_lpmbase", "pred_lpm", "pred_logit", "pred_probit"]
+].median().round(3)
+```
+
+### Table 11.5 Statistics of goodness of fit for the probability predictions of three models
+
+```{python}
+pd.DataFrame(
+    {
+        "R-squared": [
+            lpm3._r2,
+            r2_score(share["stayshealthy"], share["pred_logit"]),
+            r2_score(share["stayshealthy"], share["pred_probit"]),
+        ],
+        "Brier-score": [
+            mean_squared_error(share["stayshealthy"], share["pred_lpm"]),
+            mean_squared_error(share["stayshealthy"], share["pred_logit"]),
+            mean_squared_error(share["stayshealthy"], share["pred_probit"]),
+        ],
+        "Pseudo R-squared": [np.nan, logit_result.prsquared, probit_result.prsquared],
+        "Log-loss": [
+            -1 * log_loss(share["stayshealthy"], share["pred_lpm"]),
+            -1 * log_loss(share["stayshealthy"], share["pred_logit"]),
+            -1 * log_loss(share["stayshealthy"], share["pred_probit"]),
+        ],
+    },
+    index=["LPM", "Logit", "Probit"],
+).T.round(3)
+```
+
+### Figure 11.8 Calibration curves for the predictions of the linear probability and logit models
+
+(a) LPM
+
+```{python}
+da.create_calibration_plot(
+    share,
+    #file_name="ch11-figure-8b-calib-logit",
+    prob_var="pred_lpm",
+    actual_var="stayshealthy",
+    breaks=np.array(
+        [
+            0,
+            0.2,
+            0.25,
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6,
+            0.65,
+            0.7,
+            0.75,
+            0.8,
+            0.85,
+            1.05,
+        ]
+    ),
+)
+```
+
+(b) Logit
+
+```{python}
+da.create_calibration_plot(
+    share,
+    #file_name="ch11-figure-8b-calib-logit",
+    prob_var="pred_logit",
+    actual_var="stayshealthy",
+    breaks=np.array(
+        [
+            0,
+            0.2,
+            0.25,
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6,
+            0.65,
+            0.7,
+            0.75,
+            0.8,
+            0.85,
+            1.05,
+        ]
+    ),
+)
+```
+
+## Part 7
+
+```{python}
+df = share[["pred_lpmbase", "pred_lpm", "pred_logit", "pred_probit"]].copy()
+```
+
+```{python}
+for i in range(df.shape[0]):
+    for j in range(df.shape[1]):
+        if df.iloc[i, j] > 0.5:
+            df.iloc[i, j] = 1
+        else:
+            df.iloc[i, j] = 0
+```
+
+```{python}
+pd.crosstab(df.iloc[:, 0], share["stayshealthy"], normalize="all")
+```
+
+```{python}
+for j in range(df.shape[1]):
+    print(pd.crosstab(df.iloc[:, j], share["stayshealthy"], normalize="all"))
+    print(pd.crosstab(df.iloc[:, j], share["stayshealthy"], normalize="columns"))
+```
+
+## Figure 11.4 The logit and probit link functions
+
+```{python}
+share = pd.read_csv("ch11_share.csv", index_col=0)
+```
+
+```{python}
+share["country"] = share["country"].astype("category")
+```
+
+```{python}
+y, X = dmatrices(
+    "stayshealthy ~ smoking + ever_smoked + female + age + lspline(eduyears,[8,18]) + \
+                 income10 + lspline(bmi,[35]) + exerc + country",
+    share,
+)
+```
+
+```{python}
+logit = sm.Logit(y, X).fit()
+```
+
+```{python}
+logit.summary()
+```
+
+```{python}
+share["bx_logit"] = np.asarray(X).dot(logit.params)
+```
+
+```{python}
+share["Logit"] = logistic.cdf(share["bx_logit"])
+```
+
+```{python}
+probit = sm.Probit(y, X).fit()
+```
+
+```{python}
+probit.summary()
+```
+
+```{python}
+share["bx_probit"] = np.asarray(X).dot(probit.params)
+```
+
+```{python}
+share["Probit"] = norm.cdf(share["bx_probit"])
+```
+
+```{python}
+share_plot = pd.melt(
+    share[["bx_logit", "Logit", "Probit"]],
+    id_vars=["bx_logit"],
+    value_vars=["Logit", "Probit"],
+)
+```
+
+```{python}
+sns.lineplot(
+    data=share_plot,
+    x="bx_logit",
+    y="value",
+    hue="variable",
+    palette=[da.color[0],da.color[1]],
+    linewidth=2
+)
+
+
+plt.ylabel("Probability")
+plt.xlabel("Z values")
+
+
+plt.ylim(0, 1)
+plt.xlim(-2.5,2.5)  
+plt.yticks(ticks=np.arange(0,1.1,0.2))
+
+plt.legend(
+    title=None, 
+    loc="lower left", 
+    bbox_to_anchor=(0.8, 0.25)
+)
+
+plt.show()
+```
+

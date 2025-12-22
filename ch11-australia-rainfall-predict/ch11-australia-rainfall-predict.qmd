@@ -1,0 +1,83 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 11
+**CH11B Are Australian weather forecasts well calibrated?**
+
+using the australia-weather-forecasts dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/australia-weather-forecasts/clean"
+data_out = dirname + "da_case_studies/ch11-australia-rainfall-predict/"
+output = dirname + "da_case_studies/ch11-australia-rainfall-predict/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+data = pd.read_csv(os.path.join(data_in, "rainfall_australia.csv"))
+#data = pd.read_csv("https://osf.io/download/kdva8/")
+
+data = data.loc[
+    (data["station_name"] == "DARWIN AIRPORT") & (data["bd_FC_Before_Start"] == 39)
+]
+```
+
+```{python}
+data["rain_prob_fc"] = data["prob"] / 100
+```
+
+```{python}
+da.create_calibration_plot(
+    data,
+    prob_var="rain_prob_fc",
+    actual_var="daily_sum",
+    breaks=np.array([0, 0.005, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
+)
+```
+
+```{python}
+data["rain_prob_fc"].describe()
+```
+
+

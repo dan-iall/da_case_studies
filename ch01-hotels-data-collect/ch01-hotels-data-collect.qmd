@@ -1,0 +1,131 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 01
+**CH01A Finding a Good Deal among Hotels: Data Collection**
+
+hotels-vienna dataset
+
+version 0.9.0 2025-08-14
+
+
+### Chapter 01
+#### First look at the hotels data
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/hotels-vienna/clean/"
+data_out = dirname + "da_case_studies/ch01-hotels-data-collect/"
+output = dirname + "da_case_studies/ch01-hotels-data-collect/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions 
+from py_helper_functions import *
+```
+
+```{python}
+# load in clean and tidy data and create workfile
+df = pd.read_csv(data_in + "hotels-vienna.csv")
+
+# Download directly if you did not set up the folders
+#df = pd.read_csv("https://osf.io/y6jvb/download")
+```
+
+```{python}
+############################################
+# First look
+############################################
+df = df.filter(
+    [
+        "hotel_id",
+        "accommodation_type",
+        "country",
+        "city",
+        "city_actual",
+        "neighbourhood",
+        "center1label",
+        "distance",
+        "center2label",
+        "distance_alter",
+        "stars",
+        "rating",
+        "rating_count",
+        "ratingta",
+        "ratingta_count",
+        "year",
+        "month",
+        "weekend",
+        "holiday",
+        "nnights",
+        "price",
+        "scarce_room",
+        "offer",
+        "offer_cat",
+    ]
+)
+```
+
+```{python}
+df.describe()
+```
+
+```{python}
+df = df.filter(
+    [
+        "hotel_id",
+        "accommodation_type",
+        "country",
+        "city",
+        "city_actual",
+        "center1label",
+        "distance",
+        "stars",
+        "rating",
+        "price",
+    ]
+)
+```
+
+### Table 1.1
+
+```{python}
+df.head()
+```
+
+```{python}
+# os.mkdir(output)
+# df.loc[0:4].to_csv(output + "hotel_listobs.csv", index=False)
+```
+
+

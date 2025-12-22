@@ -1,0 +1,96 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 08
+**CH08B How is life expectancy related to the average income of a country?**
+
+using the worldbank-lifeexpectancy dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as smf
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/worldbank-lifeexpectancy/clean/"
+data_out = dirname + "da_case_studies/ch08-life-expectancy-income/"
+output = dirname + "da_case_studies/ch08-life-expectancy-income/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+Read clean data
+
+```{python}
+xc = pd.read_csv(data_in + "worldbank-lifeexpectancy.csv")
+#xc = pd.read_csv("https://osf.io/download/sh9mu/")
+```
+
+```{python}
+xc
+```
+
+select year
+
+```{python}
+xc = xc.loc[lambda x: x["year"] == 2017]
+```
+
+ GDP total, log
+
+```{python}
+xc["gdptot"] = xc["gdppc"] * xc["population"]
+xc["lngdppc"] = np.log(xc["gdppc"])
+xc["lngdptot"] = np.log(xc["gdptot"])
+```
+
+```{python}
+xc.loc[:, ["lifeexp", "gdppc", "gdptot", "lngdppc", "lngdptot"]].describe()
+```
+
+### Figure 8.3 The distribution of GDP per capita
+
+```{python}
+sns.histplot(
+    
+)
+```
+

@@ -1,0 +1,134 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 05
+**CH05A What Likelihood of Loss to Expect on a Stock Portfolio?**
+
+using the sp500 dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/sp500/clean/"
+data_out = dirname + "da_case_studies/ch05-stock-market-loss-generalize/"
+output = dirname + "da_case_studies/ch05-stock-market-loss-generalize/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+sp500 = pd.read_csv(data_in + "SP500_2006_16_data.csv")
+# sp500 = pd.read_csv("https://osf.io/h64z2/download")
+```
+
+```{python}
+sp500 = sp500.replace("", np.nan).replace("#N/A", np.nan).dropna().reset_index(drop=True)
+```
+
+```{python}
+sp500["pct_return"] = sp500["VALUE"].pct_change() * 100
+```
+
+```{python}
+sp500.head()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** create a "Crash Indicator" variable. We need to distinguish days with catastrophic losses (>5% drop) from normal trading days to calculate the probability of extreme risk.
+
+**The Syntax Anatomy:**
+* `sp500.loc[1:, "loss5"]` → **The Subject**: Our new "Risk Flag" column (ignoring the first row which has no return data).
+* `np.where(...)` → **The Verb**: A "Vectorized If-Statement" (runs on millions of rows instantly).
+* `(sp500["pct_return"] < -5, 1, 0)` → **The Settings**:
+    *   *Condition:* Is return worse than -5%?
+    *   *If True:* Set value to `1` (Loss Event).
+    *   *If False:* Set value to `0` (Normal Day).
+
+> **💡 The Wisdom Check:**
+> "We skip the first row ([1:](cci:7://file:///Users/dan.brm/Desktop/antigravity/da_case_studies/ch06-stock-market-loss-test/ch06-stock-market-loss-test.ipynb:0:0-0:0)) because percent return cannot be calculated for the very first day of data (there is no 'yesterday' to compare to)."
+
+```{python}
+# sp500.loc[1:, "loss5"] = np.where(sp500["pct_return"].dropna() < -5, 1, 0)
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: The "Crash Flag"
+**The Business Goal:** To simplify complex market data into a clear risk indicator. We want to count how many times the market crashed >5% so we can estimate the probability of extreme losses.
+
+**The Syntax Anatomy:**
+* `(sp500["pct_return"] < -5)` → **The Filter (Boolean Mask)**
+   * Finds days where returns were worse than -5%. Returns a Series of `True`/`False`.
+* `.astype(int)` → **The Converter**
+   * Transforms `True` to `1` and `False` to `0`. This effectively "digitizes" the event.
+* `sp500["loss5"] = ...` → **The Storage**
+   * Saves the result in a new column specifically for this threshold.
+
+> **💡 The Wisdom Check:**
+> When creating binary flags for analysis, always use `.astype(int)` immediately. It makes calculating the probability of the event as simple as running `.mean()` on the column later!
+
+```{python}
+# Robust. Vectorized. Handles NaNs automatically.
+sp500["loss5"] = (sp500["pct_return"] < -5).astype(int)
+```
+
+```{python}
+sp500.head()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: The Hypothesis Test
+**The Business Goal:** To scientifically validate a risk assumption. We are testing the "Null Hypothesis" that the probability of a >5% market crash is exactly 1%.
+
+**The Syntax Anatomy:**
+* `stats.ttest_1samp` → **The Statistical Test**
+   * A "One-Sample T-Test." Used when comparing your own data against a known standard or benchmark.
+* `sp500["loss5"]` → **The Sample**
+   * Our binary column. The mean of a binary column (0s and 1s) is just the *percentage of times* the event happened.
+* `popmean=0.01` → **The Benchmark**
+   * The specific probability we are testing against (1%).
+* `nan_policy="omit"` → **The Safety Switch**
+   * Tells the function to ignore any blank data points (NaNs) so the test doesn't crash.
+
+> **💡 The Wisdom Check:**
+> The default test is "Two-Sided" (checks if mean ≠ 0.01). Since we strictly care if risk is *higher* than 0.01, we consider this a "One-Sided" test. In Python `scipy.stats`, we manually divide the resulting p-value by 2 to get the one-sided probability.
+
+```{python}
+# t-test to show p-value of two sided. One sided p-value is p/2
+
+stats.ttest_1samp(sp500["loss5"], popmean=0.01, nan_policy="omit")
+```
+
+```{python}
+sp500["loss5"].mean().round(6)
+```
+
+

@@ -1,0 +1,540 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+ 
+### CHAPTER 12
+**CH12 Returns on a company stock and market returns**
+
+version 0.9.0 2025-08-14
+ 
+ 
+
+
+```{python}
+import os
+import sys
+import warnings
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+from arch.unitroot import PhillipsPerron
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.ticker import PercentFormatter
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+current_path = os.getcwd()
+base_dir = current_path.split("da_case_studies")[0]
+data_in = os.path.join(str(base_dir), "da_data_repo/stocks-sp500/raw/")
+data_out = os.path.join(str(base_dir), "da_data_repo/stocks-sp500/clean/")
+output = os.path.join(str(base_dir), "da_case_studies/ch12-stock-returns-risk/output/")
+func = os.path.join(str(base_dir), "da_case_studies/ch00-tech-prep/")
+sys.path.append(func)
+```
+
+```{python}
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+stock_data = pd.read_csv(os.path.join(data_in, "ready_sp500_45_cos.csv"))
+#stock_data = pd.read_csv("https://osf.io/download/4pgrf/")
+
+```
+
+```{python}
+stock_data.head()
+```
+
+```{python}
+MSFT = stock_data[stock_data["ticker"] == "MSFT"]
+```
+
+```{python}
+p_MSFT = (
+    MSFT[["ref.date", "price.close"]]
+    .rename(columns={"ref.date": "date"})
+    .reset_index(drop=True)
+)
+```
+
+```{python}
+p_MSFT["date"] = pd.to_datetime(p_MSFT["date"])
+```
+
+```{python}
+p_MSFT.head()
+```
+
+```{python}
+sp500_index = pd.read_csv(os.path.join(data_in, "ready_sp500_index.csv"))
+```
+
+```{python}
+p_SP500 = (
+    sp500_index[["ref.date", "price.close"]]
+    .rename(columns={"ref.date": "date"})
+    .reset_index(drop=True)
+)
+```
+
+```{python}
+p_SP500["date"] = pd.to_datetime(p_SP500["date"])
+```
+
+```{python}
+data_daily = (
+    pd.merge(p_SP500, p_MSFT, how="inner", on="date")
+    .rename(columns={"price.close_x": "p_SP500", "price.close_y": "p_MSFT"})
+    .reset_index(drop=True)
+)
+```
+
+```{python}
+data_daily = data_daily[
+    (data_daily["date"] >= "1997-12-31") & (data_daily["date"] <= "2018-12-31")
+]
+```
+
+```{python}
+data_daily["year"] = data_daily["date"].dt.year
+```
+
+```{python}
+data_daily["month"] = data_daily["date"].dt.month
+```
+
+```{python}
+# data_daily.to_csv(os.path.join(data_out,"stock-prices-daily.csv"))
+```
+
+# PART I: Graphs
+
+```{python}
+data_daily["lnp_MSFT"] = data_daily["p_MSFT"].map(lambda x: np.log(x))
+```
+
+```{python}
+data_daily["lnp_SP500"] = data_daily["p_SP500"].map(lambda x: np.log(x))
+```
+
+```{python}
+limits = datetime(1998, 1, 1), datetime(2018, 1, 1)
+```
+
+```{python}
+
+breaks_sns = [
+    "1998-01-01", "2002-01-01", "2006-01-01",
+    "2010-01-01", "2014-01-01", "2018-01-01"
+]
+```
+
+### Figure 12.2 Stock prices, daily time series
+
+For time series data, plotnine wants the index to start from 0
+
+```{python}
+data_daily = data_daily.reset_index(drop=True)
+```
+
+(a) Microsoft
+
+```{python}
+sns.lineplot(data=data_daily, x="date", y="p_MSFT", linewidth=0.6)
+
+plt.xlabel("Date (day)")
+plt.ylabel("Microsoft stock price (US dollars)")
+
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(-1,121)
+plt.yticks(ticks=np.arange(0,121, 20))  
+plt.show()
+```
+
+(b) S&P500 index
+
+```{python}
+sns.lineplot(data=data_daily, x="date", y="p_SP500", linewidth=0.6)
+
+plt.xlabel("Date (day)")
+plt.ylabel("S&P 500 Stock Market Index")
+
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(470,3030)
+plt.yticks(ticks=np.arange(500,3001, 500))  
+plt.show()
+```
+
+```{python}
+print(PhillipsPerron(data_daily["p_MSFT"], lags=32, test_type="rho", trend="n"))
+print(PhillipsPerron(data_daily["p_MSFT"], lags=32, test_type="rho", trend="c"))
+print(PhillipsPerron(data_daily["p_MSFT"], lags=32, test_type="rho", trend="ct"))
+```
+
+```{python}
+print(PhillipsPerron(data_daily["p_SP500"], lags=32, test_type="rho", trend="n"))
+print(PhillipsPerron(data_daily["p_SP500"], lags=32, test_type="rho", trend="c"))
+print(PhillipsPerron(data_daily["p_SP500"], lags=32, test_type="rho", trend="ct"))
+```
+
+```{python}
+data_daily["l.p_MSFT"] = data_daily["p_MSFT"].shift()
+data_daily["l.p_SP500"] = data_daily["p_SP500"].shift()
+data_daily["d.p_MSFT"] = data_daily["p_MSFT"] - data_daily["l.p_MSFT"]
+data_daily["d.p_SP500"] = data_daily["p_SP500"] - data_daily["l.p_SP500"]
+data_daily["PctRetMSFT"] = data_daily["d.p_MSFT"] / data_daily["l.p_MSFT"] * 100
+data_daily["PctRetSP500"] = data_daily["d.p_SP500"] / data_daily["l.p_SP500"] * 100
+```
+
+```{python}
+data_daily["d.lnp_MSFT"] = np.log(data_daily["p_MSFT"]) - np.log(
+    data_daily["p_MSFT"].shift()
+)
+data_daily["d.lnp_SP500"] = np.log(data_daily["p_SP500"]) - np.log(
+    data_daily["p_SP500"].shift()
+)
+```
+
+```{python}
+data_monthly = (
+    data_daily[["date", "year", "month", "p_SP500", "p_MSFT"]]
+    .groupby(data_daily["date"].dt.to_period("M"))
+    .last()
+    .reset_index(drop=True)
+)
+```
+
+```{python}
+data_monthly
+```
+
+```{python}
+data_monthly["l.p_MSFT"] = data_monthly["p_MSFT"].shift()
+data_monthly["l.p_SP500"] = data_monthly["p_SP500"].shift()
+data_monthly["d.p_MSFT"] = data_monthly["p_MSFT"] - data_monthly["l.p_MSFT"]
+data_monthly["d.p_SP500"] = data_monthly["p_SP500"] - data_monthly["l.p_SP500"]
+data_monthly["PctRetMSFT"] = data_monthly["d.p_MSFT"] / data_monthly["l.p_MSFT"] * 100
+data_monthly["PctRetSP500"] = (
+    data_monthly["d.p_SP500"] / data_monthly["l.p_SP500"] * 100
+)
+```
+
+```{python}
+data_monthly["d.lnp_MSFT"] = np.log(data_monthly["p_MSFT"]) - np.log(
+    data_monthly["p_MSFT"].shift()
+)
+data_monthly["d.lnp_SP500"] = np.log(data_monthly["p_SP500"]) - np.log(
+    data_monthly["p_SP500"].shift()
+)
+```
+
+```{python}
+data_daily.head()
+```
+
+```{python}
+data_monthly.head()
+```
+
+```{python}
+sns.lineplot(data=data_monthly, x="date", y="p_MSFT", linewidth=1)
+
+plt.xlabel("Date (Month)")
+plt.ylabel("Microsoft stock price (US dollars)")
+
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(-1,121)
+plt.yticks(ticks=np.arange(0,121, 20))  
+plt.show()
+```
+
+```{python}
+sns.lineplot(data=data_monthly, x="date", y="p_SP500", linewidth=1)
+
+plt.xlabel("Date (Month)")
+plt.ylabel("S&P 500 Stock Market Index")
+
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(470,3030)
+plt.yticks(ticks=np.arange(500,3001, 500))  
+plt.show()
+```
+
+```{python}
+print(PhillipsPerron(data_daily["p_MSFT"], lags=32, test_type="rho", trend="n"))
+print(PhillipsPerron(data_daily["p_MSFT"], lags=32, test_type="rho", trend="c"))
+print(PhillipsPerron(data_daily["p_MSFT"], lags=32, test_type="rho", trend="ct"))
+```
+
+```{python}
+print(PhillipsPerron(data_daily["p_SP500"], lags=32, test_type="rho", trend="n"))
+print(PhillipsPerron(data_daily["p_SP500"], lags=32, test_type="rho", trend="c"))
+print(PhillipsPerron(data_daily["p_SP500"], lags=32, test_type="rho", trend="ct"))
+```
+
+```{python}
+sns.lineplot(data=data_monthly, x="date", y="PctRetMSFT", linewidth=1)
+
+plt.axhline(y=1.13, color=da.color[2], linewidth=1)
+plt.xlabel("Date (Month)")
+plt.ylabel("Microsoft monthly returns (percent)")
+
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(-45,45)
+plt.yticks(ticks=np.arange(-40,41, 20))
+plt.show()
+```
+
+```{python}
+sns.lineplot(data=data_monthly, x="date", y="PctRetSP500", linewidth=1)
+
+plt.axhline(y=1.13, color=da.color[2], linewidth=1)
+plt.xlabel("Date (Month)")
+plt.ylabel("S&P500 index monthly returns (percent)")
+
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(-45,45)
+plt.yticks(ticks=np.arange(-40,41, 20))  
+plt.show()
+```
+
+```{python}
+data_monthly.head(2)
+```
+
+```{python}
+print(
+    PhillipsPerron(
+        data_monthly.loc[1:, "PctRetMSFT"], lags=5, test_type="rho", trend="n"
+    )
+)
+print(
+    PhillipsPerron(
+        data_monthly.loc[1:, "PctRetMSFT"], lags=5, test_type="rho", trend="c"
+    )
+)
+print(
+    PhillipsPerron(
+        data_monthly.loc[1:, "PctRetMSFT"], lags=5, test_type="rho", trend="ct"
+    )
+)
+```
+
+```{python}
+print(
+    PhillipsPerron(
+        data_monthly.loc[1:, "PctRetSP500"], lags=5, test_type="rho", trend="n"
+    )
+)
+print(
+    PhillipsPerron(
+        data_monthly.loc[1:, "PctRetSP500"], lags=5, test_type="rho", trend="c"
+    )
+)
+print(
+    PhillipsPerron(
+        data_monthly.loc[1:, "PctRetSP500"], lags=5, test_type="rho", trend="ct"
+    )
+)
+```
+
+### Table 12.1 Descriptive statistics on monthly returns
+
+```{python}
+results = (
+    data_monthly[["PctRetMSFT", "PctRetSP500"]]
+    .describe()
+    .T[["min", "max", "mean", "std", "count"]]
+    .rename(columns={"std": "sd", "count": "N"})
+)
+results.index = ["Monthly returns on Microsoft (%)", "Monthly returns on S&P500 (%)"]
+results.round(1)
+```
+
+```{python}
+reg1 = pf.feols("PctRetMSFT ~ PctRetSP500", data=data_monthly, vcov="HC1")
+reg2 = pf.feols(
+    "d_lnp_MSFT ~ d_lnp_SP500",
+    data=data_monthly.rename(
+        columns={"d.lnp_MSFT": "d_lnp_MSFT", "d.lnp_SP500": "d_lnp_SP500"}
+    ),
+    vcov="HC1",
+)
+reg3 = pf.feols("PctRetMSFT ~ PctRetSP500", data=data_daily, vcov="HC1")
+reg4 = pf.feols(
+    "d_lnp_MSFT ~ d_lnp_SP500",
+    data=data_daily.rename(
+        columns={"d.lnp_MSFT": "d_lnp_MSFT", "d.lnp_SP500": "d_lnp_SP500"}
+    ),
+    vcov="HC1",
+)
+```
+
+### Table 12.2 Returns on Microsoft and market returns: Simple regression results
+
+```{python}
+pf.etable(
+    [reg1],
+    labels={
+        "PctRetSP500": "S&P500 returns",
+        "Intercept": "Constant",
+    },
+    model_heads=["Microsoft returns"],
+    head_order="h",
+    show_se_type=False,
+    digits=2,
+)
+```
+
+```{python}
+data_monthly["PctRetMSFT_rescaled"] = data_monthly["PctRetMSFT"] / 100
+```
+
+```{python}
+sns.regplot(
+    data=data_monthly,
+    x="PctRetSP500",
+    y="PctRetMSFT_rescaled",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+plt.plot([-20, 20], [-0.2, 0.2], linestyle="dashed", color=da.color[2])
+plt.annotate(
+    "45 degree line for beta=1",
+    xy=(18, 0.2),
+    xytext=(10, 0.32),
+    fontsize=12,
+    ha="right",
+    arrowprops=dict(color=da.color[2], arrowstyle="->"),
+)
+plt.annotate(
+    "reg line, beta=1.26",
+    xy=(-15, -0.2),
+    xytext=(-3, -0.25),
+    fontsize=12,
+    ha="right",
+    arrowprops=dict(color=da.color[1], arrowstyle="->"),
+)
+plt.xlabel("S&P500 index monthly returns (percent)", fontsize=12)
+plt.ylabel("Microsoft stock monthly returns (percent)", fontsize=12)
+plt.xlim(-22, 22)
+plt.xticks(np.arange(-20, 21, 10))
+plt.ylim(-0.4, 0.42)
+plt.yticks(np.arange(-0.2, 0.4, 0.2))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.show()
+```
+
+```{python}
+data_monthly_tidy = pd.melt(
+    data_monthly[["date", "PctRetMSFT", "PctRetSP500"]],
+    id_vars=["date"],
+    var_name="index",
+    value_name="pct_return",
+)
+data_monthly_tidy["index"] = data_monthly_tidy["index"].replace({"PctRetMSFT": "Microsoft", "PctRetSP500": "S&P500"})
+```
+
+```{python}
+sns.lineplot(
+    data=data_monthly_tidy,
+    x="date",
+    y="pct_return",
+    hue="index",
+    palette={"Microsoft": da.color[0], "S&P500": da.color[1]},
+    linewidth=1
+)
+plt.legend(
+    title=None, 
+    loc="lower left", 
+    bbox_to_anchor=(0.5, 0.1), 
+    ncol=2
+)
+plt.xlabel("Date (Month)")
+plt.ylabel("Monthly returns (percent)")
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("1%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(-45,45)
+plt.yticks(ticks=np.arange(-40,41, 20))
+plt.show()
+```
+
+```{python}
+data_monthly_tidy_17_18 = data_monthly_tidy.loc[
+    data_monthly_tidy["date"] > "2017-01-01"
+]
+```
+
+```{python}
+breaks_sns = [
+    "2017-01-01", "2017-07-01", "2018-01-01",
+    "2018-07-01", "2019-01-01"
+]
+breaks_sns = pd.to_datetime(breaks_sns)
+```
+
+```{python}
+sns.lineplot(
+    data=data_monthly_tidy_17_18,
+    x="date",
+    y="pct_return",
+    hue="index",
+    palette={"Microsoft": da.color[0], "S&P500": da.color[1]},
+    linewidth=1
+)
+plt.legend(
+    title=None, 
+    loc="lower left", 
+    bbox_to_anchor=(0.5, 0.1), 
+    ncol=2
+)
+plt.xlabel("Date (Month)")
+plt.ylabel("Monthly returns (percent)")
+plt.xticks(breaks_sns, [pd.to_datetime(d).strftime("%b%Y") for d in breaks_sns], ha="right")
+plt.ylim(-13,13)
+plt.yticks(ticks=np.arange(-12,13, 4))
+plt.show()
+```
+
+### Table 12.3 Returns on Microsoft and market returns: alternative measurements
+
+```{python}
+pf.etable(
+    [reg1, reg2, reg3, reg4],
+    labels={
+        "PctRetSP500": "S&P500 returns (pct)",
+        "d_lnp_SP500": "S&P500 returns (log)",
+        "Intercept": "Constant",
+    },
+    model_heads=[
+        "Monthly pct change",
+        "Monthly log change",
+        "Daily pct change",
+        "Daily log change",
+    ],
+    head_order="h",
+    show_se_type=False,
+    digits=4,
+)
+```
+
+

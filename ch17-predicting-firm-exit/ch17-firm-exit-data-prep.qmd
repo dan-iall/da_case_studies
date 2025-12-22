@@ -1,0 +1,515 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+# Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 17
+
+**CH17A Predicting firm exit**
+
+Data preparation
+
+Using the bisnode-firms dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as smf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+path = os.getcwd()
+base_dir = path.split("da_case_studies")[0]
+
+data_dir = base_dir + "da_data_repo"
+```
+
+```{python}
+# location folders
+data_in = os.path.join(data_dir, "bisnode-firms/clean/")
+data_out = os.path.join(data_dir, "bisnode-firms/")
+output = os.path.join(data_out, "output/")
+func = os.path.join(base_dir, "da_case_studies/ch00-tech-prep/")
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+# Import data
+
+```{python}
+csv_path = os.path.join(data_in, "cs_bisnode_panel.csv")
+
+data = pd.read_csv(csv_path)
+#data = pd.read_csv("https://osf.io/download/3qyut/")
+```
+
+```{python}
+# drop variables with many NAs
+data = data.drop(
+    columns=["COGS", "finished_prod", "net_dom_sales", "net_exp_sales", "wages"]
+)
+data = data.query("year !=2016")
+```
+
+
+# Label engineering
+
+```{python}
+# add all missing year and comp_id combinations -
+# originally missing combinations will have NAs in all other columns
+data = (
+    data.set_index(["year", "comp_id"])
+    .unstack(fill_value="toReplace")
+    .stack()
+    .reset_index()
+)
+data = data.replace("toReplace", np.nan)  # only way I could define it as NaN
+```
+
+```{python}
+# generate status_alive; if sales larger than zero and not-NA, then firm is alive
+data["status_alive"] = (data["sales"] > 0 & (False == data["sales"].isna())).astype(int)
+
+# defaults in two years if there are sales in this year but no sales two years later
+# Status_in_two_years: data.groupby('comp_id')['status_alive'].shift(-2)
+data["default"] = (
+    (data["status_alive"] == 1)
+    & (data.groupby("comp_id")["status_alive"].shift(-2) == 0)
+).astype(int)
+```
+
+```{python}
+data = data.query("year <= 2013")
+```
+
+```{python}
+data["default"].describe()
+```
+
+```{python}
+data["sales"].describe()
+```
+
+```{python}
+data["sales"] = np.where(
+    data["sales"] < 0, 1, data["sales"]
+)  # has to be outside of assin()
+data = data.assign(
+    ln_sales=np.where(
+        data["sales"] > 0,
+        np.log(data["sales"]),
+        (np.where(data["sales"].isna(), np.nan, 0)),
+    ),  # NaN remain NaN
+    sales_mil=data["sales"] / 1000000,
+    sales_mil_log=np.where(
+        data["sales"] > 0,
+        np.log(data["sales"] / 1000000),
+        (np.where(data["sales"].isna(), np.nan, 0)),
+    ),
+)
+```
+
+```{python}
+data["d1_sales_mil_log"] = data["sales_mil_log"] - data.groupby("comp_id")[
+    "sales_mil_log"
+].shift(1)
+```
+
+```{python}
+# replace w 0 for new firms + add dummy to capture it
+data["age"] = np.where(
+    data["year"] - data["founded_year"] < 0, 0, data["year"] - data["founded_year"]
+)
+data["new"] = np.where(
+    ((data["age"] <= 1) | (data["balsheet_notfullyear"] == 1)),
+    1,
+    (np.where(data["age"].isna(), np.nan, 0)),
+)
+data["d1_sales_mil_log"] = np.where(
+    data["new"] == 1, 0, np.where(data["new"].isna(), np.nan, data["d1_sales_mil_log"])
+)
+data["new"] = np.where(data["d1_sales_mil_log"].isna(), 1, data["new"])
+data["d1_sales_mil_log"] = np.where(
+    data["d1_sales_mil_log"].isna(), 0, data["d1_sales_mil_log"]
+)
+```
+
+```{python}
+data["new"].describe()
+```
+
+# Sample design
+
+```{python}
+# look at cross section
+data = data.query("year==2012 & status_alive == 1")
+# look at firms below 10m euro revenues and above 1000 euros
+data = data.query("sales_mil<=10 & sales_mil>=0.001")
+```
+
+```{python}
+data["default"].describe()
+```
+
+```{python}
+data.to_csv(data_out + "work5.csv", index=False)
+```
+
+# Feature engineering
+
+```{python}
+current_csv_path = os.path.join(data_out, "work5.csv")
+data = pd.read_csv(current_csv_path)
+```
+
+```{python}
+# change some industry category codes
+data["ind2_cat"] = data["ind2"].copy()
+data["ind2_cat"] = np.where(data["ind2"] > 56, 60, data["ind2_cat"])
+data["ind2_cat"] = np.where(data["ind2"] < 26, 20, data["ind2_cat"])
+data["ind2_cat"] = np.where(
+    (data["ind2"] < 55) & (data["ind2"] > 35), 40, data["ind2_cat"]
+)
+data["ind2_cat"] = np.where(data["ind2"] == 31, 30, data["ind2_cat"])
+data["ind2_cat"] = np.where(data["ind2"].isna(), 99, data["ind2_cat"])
+```
+
+```{python}
+data.groupby("ind2_cat").count()["comp_id"]
+```
+
+```{python}
+# Firm characteristics
+data["age2"] = data["age"] ** 2
+data["foreign_management"] = np.where(
+    data["foreign"] >= 0.5, 1, np.where(data["foreign"].isna(), np.nan, 0)
+)
+data["gender_m"] = data["gender"].astype("category")
+data["m_region_loc"] = data["region_m"].astype("category")
+```
+
+```{python}
+###########################################################
+# look at more financial variables, create ratios
+###########################################################
+
+# assets can't be negative. Change them to 0 and add a flag.
+data["flag_asset_problem"] = np.where(
+    (
+        (data["intang_assets"] < 0)
+        | (data["curr_assets"] < 0)
+        | (data["fixed_assets"] < 0)
+    ),
+    1,
+    0,
+)
+data["flag_asset_problem"] = np.where(
+    (
+        (data["intang_assets"].isna())
+        | (data["curr_assets"].isna())
+        | (data["fixed_assets"].isna())
+    ),
+    np.nan,
+    data["flag_asset_problem"],
+)
+data.groupby("flag_asset_problem").count()["comp_id"]
+```
+
+```{python}
+data["intang_assets"] = np.where(data["intang_assets"] < 0, 0, data["intang_assets"])
+data["curr_assets"] = np.where(data["curr_assets"] < 0, 0, data["curr_assets"])
+data["fixed_assets"] = np.where(data["fixed_assets"] < 0, 0, data["fixed_assets"])
+```
+
+```{python}
+# generate total assets
+data["total_assets_bs"] = (
+    data["intang_assets"] + data["curr_assets"] + data["fixed_assets"]
+)
+data["total_assets_bs"].describe()
+```
+
+```{python}
+pl_names = [
+    "extra_exp",
+    "extra_inc",
+    "extra_profit_loss",
+    "inc_bef_tax",
+    "inventories",
+    "material_exp",
+    "profit_loss_year",
+    "personnel_exp",
+]
+bs_names = [
+    "intang_assets",
+    "curr_liab",
+    "fixed_assets",
+    "liq_assets",
+    "curr_assets",
+    "share_eq",
+    "subscribed_cap",
+    "tang_assets",
+]
+```
+
+```{python}
+# divide all pl_names elements by sales and create new column for it
+data[[col + "_pl" for col in pl_names]] = data[pl_names].div(
+    data["sales"], axis="index"
+)
+```
+
+```{python}
+# divide all bs_names elements by total_assets_bs and create new column for it
+data[[col + "_bs" for col in bs_names]] = (
+    data[bs_names]
+    .div(data["total_assets_bs"], axis="index")
+    .replace((np.inf, -np.inf, np.nan), (0, 0, 0))
+)
+# get Nan values where total_assets_bs is NaN
+for col in bs_names:
+    data[col + "_bs"] = np.where(
+        data["total_assets_bs"].isna(), np.nan, data[col + "_bs"]
+    )
+```
+
+```{python}
+########################################################################
+# creating flags, and winsorizing tails
+########################################################################
+
+# Variables that represent accounting items that cannot be negative (e.g. materials)
+zero = [
+    "extra_exp_pl",
+    "extra_inc_pl",
+    "inventories_pl",
+    "material_exp_pl",
+    "personnel_exp_pl",
+    "curr_liab_bs",
+    "fixed_assets_bs",
+    "liq_assets_bs",
+    "curr_assets_bs",
+    "subscribed_cap_bs",
+    "intang_assets_bs",
+]
+
+data[[col + "_flag_high" for col in zero]] = np.where(
+    data[zero].isna(), np.nan, (data[zero] > 1).astype(int)
+)
+data[[col for col in zero]] = np.where(
+    data[zero].isna(), np.nan, np.where(data[zero] > 1, 1, data[zero])
+)
+data[[col + "_flag_error" for col in zero]] = np.where(
+    data[zero].isna(), np.nan, (data[zero] < 0).astype(int)
+)
+data[[col for col in zero]] = np.where(
+    data[zero].isna(), np.nan, np.where(data[zero] < 0, 0, data[zero])
+)
+```
+
+```{python}
+# for vars that could be any, but are mostly between -1 and 1
+anyof = ["extra_profit_loss_pl", "inc_bef_tax_pl", "profit_loss_year_pl", "share_eq_bs"]
+
+data[[col + "_flag_low" for col in anyof]] = np.where(
+    data[anyof].isna(), np.nan, (data[anyof] < -1).astype(int)
+)
+data[[col for col in anyof]] = np.where(
+    data[anyof].isna(), np.nan, np.where((data[anyof] < -1), -1, data[anyof])
+)
+data[[col + "_flag_high" for col in anyof]] = np.where(
+    data[anyof].isna(), np.nan, (data[anyof] > 1).astype(int)
+)
+data[[col for col in anyof]] = np.where(
+    data[anyof].isna(), np.nan, np.where((data[anyof] > 1), 1, data[anyof])
+)
+data[[col + "_flag_zero" for col in anyof]] = np.where(
+    data[anyof].isna(), np.nan, (data[anyof] == 0).astype(int)
+)
+data[[col + "_quad" for col in anyof]] = np.where(
+    data[anyof].isna(), np.nan, data[anyof] ** 2
+)
+```
+
+```{python}
+# dropping flags with no variation
+flag_columns = [col for col in data.columns if "flag" in col]
+data = data.drop(
+    data[flag_columns].std()[(data[flag_columns].std() == 0)].index, axis=1
+)
+```
+
+```{python}
+########################################################################
+# additional
+# including some imputation
+########################################################################
+
+# CEO age
+data["ceo_age"] = data["year"] - data["birth_year"]
+data = data.assign(
+    flag_low_ceo_age=(data["ceo_age"] < 25).astype(int),
+    flag_high_ceo_age=(data["ceo_age"] > 75).astype(int),
+    flag_miss_ceo_age=(data["ceo_age"].isna()).astype(int),
+)
+
+
+data["ceo_age"] = np.where(data["ceo_age"] < 25, 25, data["ceo_age"])
+data["ceo_age"] = np.where(data["ceo_age"] > 75, 75, data["ceo_age"])
+data["ceo_age"] = np.where(
+    data["ceo_age"].isna(), data["ceo_age"].mean(), data["ceo_age"]
+)
+data["ceo_young"] = (data["ceo_age"] < 40).astype(int)
+```
+
+```{python}
+# number emp, very noisy measure
+data["labor_avg_mod"] = np.where(
+    data["labor_avg"].isna(), data["labor_avg"].mean(), data["labor_avg"]
+)
+data["flag_miss_labor_avg"] = (data["labor_avg"].isna()).astype(int)
+```
+
+```{python}
+data["labor_avg"].describe()
+```
+
+```{python}
+data["labor_avg_mod"].describe()
+```
+
+```{python}
+data = data.drop(["labor_avg"], axis=1)
+```
+
+```{python}
+# create category type variables
+data["urban_m"] = data["urban_m"].astype("category")
+data["ind2_cat"] = data["ind2_cat"].astype("category")
+data["default_f"] = data["default"].astype("category")
+data["default_f"] = data["default_f"].cat.rename_categories(["no_default", "default"])
+```
+
+```{python}
+########################################################################
+# sales
+########################################################################
+data["sales_mil_log_sq"] = data["sales_mil_log"] ** 2
+```
+
+```{python}
+sns.scatterplot(x="sales_mil_log", y="default", data=data)
+
+# Linear model with quadratic term
+sns.regplot(
+    x="sales_mil_log",
+    y="default",
+    data=data,
+    order=2,
+    ci=None,
+    color=da.color[1],
+    scatter=False,
+)
+da.plot_loess(data, "sales_mil_log", "default", span=0.9, color=da.color[2])
+plt.show()
+```
+
+```{python}
+# Linear regressions
+ols_s = smf.ols("default ~ sales_mil_log + sales_mil_log_sq", data=data).fit()
+print(ols_s.summary())
+```
+
+```{python}
+########################################################################
+# sales change
+########################################################################
+# Note: graphs not in book
+
+# lowess
+data["d1_sales_mil_log"].describe()
+```
+
+```{python}
+sns.scatterplot(x="d1_sales_mil_log", y="default", data=data)
+da.plot_loess(data, "d1_sales_mil_log", "default", span=0.9, color=da.color[2])
+plt.show()
+```
+
+```{python}
+# generate variables ---------------------------------------------------
+
+data["flag_low_d1_sales_mil_log"] = np.where(data["d1_sales_mil_log"] < -1.5, 1, 0)
+data["flag_high_d1_sales_mil_log"] = np.where(data["d1_sales_mil_log"] > 1.5, 1, 0)
+data["d1_sales_mil_log_mod"] = np.where(
+    data["d1_sales_mil_log"] < -1.5,
+    -1.5,
+    np.where(data["d1_sales_mil_log"] > 1.5, 1.5, data["d1_sales_mil_log"]),
+)
+data["d1_sales_mil_log_mod_sq"] = data["d1_sales_mil_log_mod"] ** 2
+```
+
+```{python}
+# no more imputation, drop obs if key vars missing
+data = data.dropna(subset=["liq_assets_bs", "foreign", "ind"])
+```
+
+```{python}
+# drop missing
+data = data.dropna(subset=["age", "foreign", "material_exp_pl", "m_region_loc"])
+data["age"].describe()
+```
+
+```{python}
+# drop unused factor levels
+for col in data.select_dtypes(include=["category"]).columns:
+    data[col] = data[col].cat.remove_unused_categories()
+```
+
+```{python}
+sns.scatterplot(x="d1_sales_mil_log", y="default", data=data)
+da.plot_loess(data, "d1_sales_mil_log", "default", span=0.9, color=da.color[1])
+plt.xlim(-1.5, 1.5)
+plt.xlabel("Growth rate (Diff of ln sales)")
+```
+
+```{python}
+sns.scatterplot(x="d1_sales_mil_log", y="d1_sales_mil_log_mod", s=10, data=data)
+plt.xlim(-5, 5)
+plt.ylim(-3, 3)
+plt.xlabel("Growth rate (Diff of ln sales)")
+```
+
+```{python}
+data.to_csv(data_out + "bisnode_firms_clean.csv", index=False)
+```
+

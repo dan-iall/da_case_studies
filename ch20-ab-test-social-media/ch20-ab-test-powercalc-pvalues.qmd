@@ -1,0 +1,128 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+
+### CHAPTER 20
+
+**CH20B Fine tuning social media advertising**
+
+using the ab-test-social-media dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import pandas as pd
+import pyfixest as pf
+import statsmodels.stats.api as sms
+from statsmodels.stats.power import TTestIndPower
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/ab-test-social-media/clean"
+data_out = dirname + "da_case_studies/ch20-ab-test-social-media/"
+output = dirname + "da_case_studies/ch20-ab-test-social-media/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+## Part I
+
+sample size calculation
+
+sample size calculation with planned rates
+
+```{python}
+clickthrough = 0.01
+
+conversion = 0.05
+
+proportionA = clickthrough * conversion
+
+proportionB = proportionA * 1.2
+
+es = sms.proportion_effectsize(proportionA, proportionB)
+# es = proportionB - proportionA
+TTestIndPower().solve_power(es, power=0.8, alpha=0.05) * 2
+```
+
+```{python}
+clickthrough = 0.0032
+
+conversion = 0.0082
+
+proportionA = clickthrough * conversion
+
+proportionB = proportionA * 1.2
+
+es = sms.proportion_effectsize(proportionA, proportionB)
+# es = proportionB - proportionA
+TTestIndPower().solve_power(es, power=0.8, alpha=0.05) * 2
+```
+
+## Part II
+
+p-value of tests
+
+```{python}
+summary_data = pd.read_excel(data_in + "/ab-test-summary.xlsx").set_index("action_type")
+# summary_data = pd.read_excel("https://osf.io/download/mhybr/").set_index("action_type")
+```
+
+```{python}
+summary_data
+```
+
+```{python}
+data = pd.DataFrame(0, columns=["type_b", "clicks", "action"], index=range(0, 2000000))
+
+data.loc[0:999999, "type_b"] = 1
+
+data.loc[0 : summary_data.loc["Action A", "clicks"] - 1, "clicks"] = 1
+data.loc[1000000 : 1000000 + summary_data.loc["Action B", "clicks"] - 1, "clicks"] = 1
+data.loc[0 : summary_data.loc["Action A", "action"] - 1, "action"] = 1
+data.loc[1000000 : 1000000 + summary_data.loc["Action B", "action"] - 1, "action"] = 1
+```
+
+```{python}
+data.groupby(["type_b", "clicks"]).count()
+```
+
+```{python}
+data.groupby(["type_b", "action"]).count()
+```
+
+```{python}
+pf.feols("clicks ~ 1 + type_b", data, vcov="hetero").summary()
+```
+
+```{python}
+pf.feols("action ~ 1 + type_b", data, vcov="hetero").summary()
+```
+
+

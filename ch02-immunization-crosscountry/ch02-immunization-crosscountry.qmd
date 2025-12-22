@@ -1,0 +1,168 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 02
+**CH02C Displaying immunization rates across countries**
+
+using the world-bank-immunization dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/worldbank-immunization/clean/"
+data_out = dirname + "da_case_studies/ch02-immunization-crosscountry/"
+output = dirname + "da_case_studies/ch02-immunization-crosscountry/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions 
+import py_helper_functions as da
+```
+
+```{python}
+# load in clean and tidy data and create workfile
+df = pd.read_csv(data_in + "worldbank-immunization-panel.csv")
+#df = pd.read_csv("https://osf.io/download/gk5cn/")
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Targeted Subsetting
+**The Business Goal:**
+We are isolating a specific "Case Study" dataset. We only care about the relationship between Wealth (`gdppc`) and Immunization (`imm`) in the India-Pakistan region for recent years (post-2015). Everything else is noise.
+
+**The Syntax Anatomy:**
+* `df.filter(["..."])` → **The Vertical Slice**: discarding irrelevant columns (variables) to save memory and mental load.
+* `.loc[...]` → **The Horizontal Slice**: discarding irrelevant rows (observations).
+* `&` and `|` → **The Boolean Logic**: `&` means "AND" (both must be true), `|` means "OR" (at least one must be true).
+
+> **💡 The Wisdom Check:**
+> When combining multiple conditions in Pandas (like `|` and `&`), **parentheses are non-negotiable**. Without wrapping each condition in `( )`, Python gets confused about the order of operations and will throw an error.
+
+```{python}
+# # cleaning
+# df = df.filter(["countryname", "year", "imm", "gdppc"]).loc[
+#     (df["year"] >= 2015)
+#     & ((df["countryname"] == "Pakistan") | (df["countryname"] == "India"))
+# ]
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Scalable Filtering
+**The Business Goal:**
+We are creating a robust data pipeline that separates *what* we want (configuration) from *how* we get it (logic). This makes the code readable and easy to update if we decide to add more countries later.
+
+**The Syntax Anatomy:**
+* `cols_to_keep = [...]` → **The Configuration**: Defining our parameters upfront so the logic remains clean.
+* `df[...]` (Double Brackets) → **The Projection**: Selecting a subset of columns. Equivalent to SQL `SELECT`.
+* `.isin(list)` → **The Membership Test**: A cleaner, scalable alternative to multiple `OR` statements (`condition | condition`). It checks if the value exists anywhere in the provided list.
+
+> **💡 The Wisdom Check:**
+> When filtering for multiple values in the same category (like multiple countries), always prefer `.isin()` over chain `|` (OR) operators. It renders your intent clearly: "Is this row a member of this target group?"
+
+```{python}
+# The "Bellonda Approved" Version
+cols_to_keep = ["countryname", "year", "imm", "gdppc"]
+countries_of_interest = ["Pakistan", "India"]
+
+df = (
+    df[cols_to_keep]
+    .loc[
+        (df["year"] >= 2015) & 
+        (df["countryname"].isin(countries_of_interest))
+    ]
+)
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: The "Lean" Summary
+**The Business Goal:**
+We want a high-level overview of the data's health (Counts, Averages, Extremes) without the visual clutter of quartiles (25%, 50%, 75%). This is useful when you just want to check if the data exists and looks roughly correct (sanity check), rather than analyzing its distribution shape.
+
+**The Syntax Anatomy:**
+* `.describe()` → **The Audit Tool**: Generates descriptive statistics (count, mean, std, min, max, etc.).
+* `percentiles=` → **The Setting**: Controls which percentiles to calculate.
+* `[]` (Empty List) → **The Silencer**: We pass an empty list to tell the function: "Do not calculate or display any percentiles."
+
+> **💡 The Wisdom Check:**
+> Calculating percentiles (sorting data) is computationally more expensive than simple aggregates like `mean` or `min`. On massive datasets (millions of rows), `percentiles=[]` can actually make your `.describe()` call run significantly faster!
+
+```{python}
+df.describe(percentiles=[])
+```
+
+```{python}
+df
+```
+
+```{python}
+df.filter(["countryname", "year", "imm", "gdppc"])
+```
+
+```{python}
+df[['countryname', 'year', 'imm', 'gdppc']]
+```
+
+```{python}
+df
+```
+
+```{python}
+# Table 2.4
+df.sort_values(["countryname", "year"])
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Reshaping (Long to Wide)
+**The Business Goal:**
+We are converting machine-friendly data (Long Format) into human-friendly data (Wide Format). By moving "years" to the columns, we can visually scan a single country's row to see its progression over time, rather than scrolling down through multiple rows.
+
+**The Syntax Anatomy:**
+* `.set_index(["A", "B"])` → **The Anchor**: Converts regular columns into the DataFrame's Index (Row Labels). Required before unstacking.
+* `.unstack("B")` → **The Pivot**: Takes a level of the index (Level "B") and rotates it to become Column Headers. unstack() is blind to regular columns. It only looks at the Index.
+
+> **💡 The Wisdom Check:**
+> `unstack` is the opposite of `stack`.
+> *   **Stack:** Moves Columns → Index (Makes data Tall/Long)
+> *   **Unstack:** Moves Index → Columns (Makes data Fat/Wide)
+
+```{python}
+df = df.set_index(["countryname", "year"]).unstack("year")
+df
+```
+
+```{python}
+# reset column names from multiindex
+df.columns = [x[0] + "_" + str(x[1]) for x in df.columns]
+
+#Table 2.5
+df
+```
+
+

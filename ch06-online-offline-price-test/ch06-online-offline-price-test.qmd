@@ -1,0 +1,219 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 06
+**CH06A Comparing Online and Offline Prices: Testing the Difference**
+
+billion-prices dataset dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/billion-prices/clean/"
+data_out = dirname + "da_case_studies/ch06-online-offline-price-test/"
+output = dirname + "da_case_studies/ch06-online-offline-price-test/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+data = pd.read_csv(data_in + "online_offline_ALL_clean.csv", encoding="latin1")
+# data = pd.read_csv("https://osf.io/yhbr5/download", encoding="latin1")
+```
+
+```{python}
+# FILTER DATA
+data = data.loc[
+ (data["COUNTRY"] == "USA")
+    & (data["PRICETYPE"] == "Regular Price")
+    & (data["sale_online"].isnull())
+    & (data["price"].notna())
+    & (data["price_online"].notna())
+]
+```
+
+```{python}
+# Drop obvious errors
+data = data.loc[data["price"] < 1000]
+```
+
+```{python}
+# Compare variables
+data["diff"] = data["price_online"] - data["price"]
+descr = data["diff"].describe()
+```
+
+```{python}
+descr
+```
+
+```{python}
+sns.histplot(
+    data['diff'], 
+    binwidth=5, 
+    binrange=(-380,415),
+    color=da.color[0], 
+    alpha=1
+)
+
+
+plt.xlabel("Online - offline price difference (US dollars)", fontsize=12)
+plt.ylabel("Frequency", fontsize=12)
+plt.xlim(-420, 420)
+plt.xticks(np.arange(-400, 421, 100))
+plt.ylim(0, 6000)
+plt.yticks(np.arange(0, 6001, 1000))
+
+
+plt.annotate(
+    "max value= 415", 
+    xy=(415, 20), 
+    xytext=(170, 700), 
+    arrowprops=dict(color='black', arrowstyle='->'),
+    fontsize=11.5
+)
+plt.annotate(
+    "min value= -380", 
+    xy=(-380, 20), 
+    xytext=(-300, 700), 
+    arrowprops=dict(color='black', arrowstyle='->'),
+    fontsize=11.5
+)
+plt.show()
+```
+
+```{python}
+# 4.99999 not 5 -- needed because of data imported from stata may be stored wierdly.
+data1 = data.loc[abs(data["diff"]) < 4.999999]
+data1["diff"].describe()
+```
+
+```{python}
+sns.histplot(
+    data['diff'], 
+    binwidth=0.5, 
+    binrange=(-5.25, 5.74),  
+    color=da.color[0], 
+    edgecolor='white', 
+    alpha=1
+)
+
+
+plt.xlabel("Online - offline price difference (US dollars)", fontsize=12)
+plt.ylabel("Frequency", fontsize=12)
+plt.xlim(-5.1, 5.1)
+plt.xticks(np.arange(-5, 6, 1))
+plt.ylim(0, 5000)
+plt.yticks(np.arange(0, 5001, 1000))
+
+plt.show()
+```
+
+```{python}
+# # [Bellonda's Refactor]
+# # Goal: Automate the verdict on Online vs. Offline Price Parity
+
+# from scipy import stats
+
+# # 1. Run the test (comparing mean difference to 0)
+# results = stats.ttest_1samp(data["diff"], 0)
+# t_stat = results.statistic
+# p_val = results.pvalue
+
+# # 2. Business Interpretation (Alpha = 5%)
+# print(f"--- HYPOTHESIS TEST RESULTS ---")
+# print(f"T-Statistic: {t_stat:.4f}")
+# print(f"P-Value:     {p_val:.5f}")
+
+# if p_val < 0.05:
+#     print("\n[!] RESULT: STATISTICALLY SIGNIFICANT")
+#     print(f"    We reject the hypothesis that prices are equal.")
+    
+#     if t_stat > 0:
+#         print(f"    VERDICT: Online prices are typically HIGHER than offline prices.")
+#     else:
+#         print(f"    VERDICT: Online prices are typically LOWER than offline prices.")
+# else:
+#     print("\n[-] RESULT: NOT SIGNIFICANT")
+#     print("    VERDICT: We cannot prove a difference. Online and Offline prices are statistically indistinguishable.")
+```
+
+```{python}
+#| tags: []
+# HYPOTHESIS
+from scipy import stats
+
+stats.ttest_1samp(data["diff"], 0)
+```
+
+```{python}
+def t_test_1samp(series, mu=0):
+    """
+    This is a function to calculate t_test for 1 sample.
+    Return: tuple of 2 elements, first is sample mean, second is t test object from scipy
+    """
+    return (np.mean(series), stats.ttest_1samp(series, mu))
+```
+
+```{python}
+# MULTIPLE HYPOTHESES
+spd = [data.loc[data["retailer"] == x] for x in set(data["retailer"])]
+out = [(set(x["retailer"]), t_test_1samp(x["diff"], 0)) for x in spd]
+```
+
+```{python}
+out
+```
+
+```{python}
+table_out = pd.DataFrame.from_records(
+    [
+        {"retailer": list(x[0])[0], "estimate": x[1][0], "p.value": x[1][1].pvalue}
+        for x in out
+    ]
+)
+```
+
+```{python}
+table_out
+```
+
+

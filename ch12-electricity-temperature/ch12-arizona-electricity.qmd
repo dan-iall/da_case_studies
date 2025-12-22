@@ -1,0 +1,357 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+ 
+### CHAPTER 12
+**CH12B Electricity consumption and temperature**
+
+case-shiller-la dataset
+
+version 0.9.0 2025-08-14
+ 
+ 
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import pandas as pd
+import numpy as np
+import statsmodels.formula.api as smf
+from stargazer.stargazer import Stargazer
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+current_path = os.getcwd()
+base_dir = current_path.split("da_case_studies")[0]
+
+data_in = os.path.join(str(base_dir), "da_data_repo/arizona-electricity/clean/")
+data_out = os.path.join(str(base_dir), "da_case_studies/ch12-electrictiy-temperature/")
+output = os.path.join(
+    str(base_dir), "da_case_studies/ch12-electrictiy-temperature/output/"
+)
+func = os.path.join(str(base_dir), "da_case_studies/ch00-tech-prep/")
+
+sys.path.append(func)
+```
+
+```{python}
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+electricity = pd.read_csv(os.path.join(data_in, "electricity_resid_AZ.csv"))
+#electricity = pd.read_csv("https://osf.io/download/wbef4/")
+
+```
+
+```{python}
+electricity.head()
+```
+
+```{python}
+electricity["date"] = pd.to_datetime(electricity["MY"], format="%b-%y")
+
+electricity["year"] = electricity["date"].dt.year
+electricity["month"] = electricity["date"].dt.month
+electricity["ym"] = (
+    electricity["year"].astype(str).str.cat(electricity["month"].astype(str), sep="m")
+)
+
+electricity = electricity[["Q", "date", "ym"]]
+
+electricity["lnQ"] = electricity["Q"].map(np.log)
+```
+
+```{python}
+electricity.head()
+```
+
+```{python}
+climate = pd.read_csv(os.path.join(data_in, "climate_Phoenix_AZ.csv"))
+```
+
+```{python}
+climate.head()
+```
+
+```{python}
+climate["tempdate"] = pd.to_datetime(climate["DATE"], format="%Y-%m")
+
+climate["year"] = climate["tempdate"].dt.year
+climate["month"] = climate["tempdate"].dt.month
+climate["ym"] = (
+    climate["year"].astype(str).str.cat(climate["month"].astype(str), sep="m")
+)
+
+climate["ndays"] = 30
+climate.loc[climate["month"].isin([1, 3, 5, 7, 8, 10, 12]), "ndays"] = 31
+climate.loc[climate["month"] == 2, "ndays"] = 28
+
+for x in ["CLDD", "HTDD", "DX70", "DX90"]:
+    climate[x + "_avg"] = climate[x] / climate["ndays"]
+
+climate = climate.drop(columns=["DATE", "tempdate", "STATION", "NAME"])
+```
+
+```{python}
+climate.head()
+```
+
+```{python}
+climate[["CLDD_avg", "HTDD_avg", "DX70_avg", "DX90_avg"]].describe()
+```
+
+```{python}
+data = pd.merge(climate, electricity, on="ym", how="inner")
+```
+
+```{python}
+data = data[(data["year"] >= 2001) & (data["year"] <= 2017)].reset_index(drop=True)
+```
+
+```{python}
+data.loc[data["Q"].notnull(), ["year", "month"]].describe()
+```
+
+```{python}
+data.loc[data["CLDD"].notnull(), ["year", "month"]].describe()
+```
+
+```{python}
+data[["Q", "lnQ", "CLDD_avg", "HTDD_avg"]].describe()
+```
+
+```{python}
+sns.lineplot(
+    data=data,
+    x="date",
+    y="Q",
+    linewidth=1.5
+)
+plt.xlabel("Date (month)")
+plt.ylabel("Residential electricity consumption (GWh)")
+plt.ylim(1000, 5000)
+plt.yticks(range(1000, 5001, 1000))  
+breaks = [
+    "2001-01-01", "2004-01-01", "2007-01-01",
+    "2010-01-01", "2013-01-01", "2016-01-01"
+]
+breaks = pd.to_datetime(breaks)  
+plt.xticks(breaks, [pd.to_datetime(d).strftime("%b%Y") for d in breaks], rotation=45, ha="right")
+plt.show()
+```
+
+```{python}
+sns.lineplot(
+    data=data,
+    x="date",
+    y="lnQ",
+    linewidth=1.5
+)
+plt.xlabel("Date (month)")
+plt.ylabel("ln(Residential electricity consumption (GWh))")
+plt.ylim(7,8.6)
+plt.yticks(ticks=np.arange(7,8.6, 0.25))  
+breaks = [
+    "2001-01-01", "2004-01-01", "2007-01-01",
+    "2010-01-01", "2013-01-01", "2016-01-01"
+]
+breaks = pd.to_datetime(breaks)  
+plt.xticks(breaks, [pd.to_datetime(d).strftime("%b%Y") for d in breaks], rotation=45, ha="right")
+plt.show()
+```
+
+```{python}
+sns.lineplot(
+    data=data,
+    x="date",
+    y="CLDD_avg",
+    linewidth=1.5
+)
+plt.xlabel("Date (month)")
+plt.ylabel("Cooling Degrees (Fahrenheit))")
+plt.ylim(-1,36)
+plt.yticks(ticks=np.arange(0,36, 5))  
+breaks = [
+    "2001-01-01", "2004-01-01", "2007-01-01",
+    "2010-01-01", "2013-01-01", "2016-01-01"
+]
+breaks = pd.to_datetime(breaks)  
+plt.xticks(breaks, [pd.to_datetime(d).strftime("%b%Y") for d in breaks], rotation=45, ha="right")
+plt.show()
+```
+
+```{python}
+sns.lineplot(
+    data=data,
+    x="date",
+    y="HTDD_avg",
+    linewidth=1.5
+)
+plt.xlabel("Date (month)")
+plt.ylabel("Heating Degrees (Fahrenheit))")
+plt.ylim(-0.3,14.3)
+plt.yticks(ticks=np.arange(0,15, 2))  
+breaks = [
+    "2001-01-01", "2004-01-01", "2007-01-01",
+    "2010-01-01", "2013-01-01", "2016-01-01"
+]
+breaks = pd.to_datetime(breaks)  
+plt.xticks(breaks, [pd.to_datetime(d).strftime("%b%Y") for d in breaks], rotation=45, ha="right")
+plt.show()
+```
+
+# Serial correlation
+
+```{python}
+for x in ["lnQ", "CLDD_avg", "HTDD_avg", "DX90_avg"]:
+    data["D" + x] = data[x] - data[x].shift()
+```
+
+```{python}
+# # functional form investigations (not in textbook)
+```
+
+```{python}
+sns.regplot(data=data, x="DCLDD_avg", y="DlnQ",ci = False,truncate=False,
+            line_kws=dict(color=da.color[1]),
+            scatter_kws=dict(alpha = 1,s = 10))
+
+
+plt.xlabel("Cooling degrees (Farenheit), first difference", fontsize=12)
+plt.ylabel("ln(monthly electricity consumption), first difference", fontsize=12)
+plt.xlim(-22, 22)
+plt.xticks(np.arange(-20, 21, 10))  
+plt.ylim(-0.51,0.51)
+plt.yticks(np.arange(-0.5, 0.51, 0.25)) 
+plt.show()
+```
+
+```{python}
+# This is 
+sns.scatterplot(data=data[data["DlnQ"].isna()==False],x="DHTDD_avg",y="DlnQ",s=20)
+da.plot_loess(data=data[data["DlnQ"].isna()==False],x="DHTDD_avg",y="DlnQ",span=0.9,color=da.color[1]) # loess.fit can not handle NaN
+
+plt.xlabel("Heating degrees (Farenheit), first difference", fontsize=12)
+plt.ylabel("ln(monthly electricity consumption), first difference", fontsize=12)
+plt.xlim(-11,11)
+plt.xticks(np.arange(-10, 11, 10))  
+plt.ylim(-0.51,0.51)
+plt.yticks(np.arange(-0.5, 0.51, 0.25)) 
+plt.show()
+```
+
+# Linear regressions
+
+HAC standard errors are not yet supported in Pyfixest
+
+```{python}
+reg1 = (
+    smf.ols("DlnQ ~ DCLDD_avg + DHTDD_avg", data)
+    .fit()
+    .get_robustcov_results(cov_type="HAC", maxlags=18)
+)
+reg2 = (
+    smf.ols("DlnQ ~ DCLDD_avg + DHTDD_avg + C(month)", data)
+    .fit()
+    .get_robustcov_results(cov_type="HAC", maxlags=18)
+)
+```
+
+```{python}
+reg1.summary()
+```
+
+```{python}
+reg2.summary()
+```
+
+```{python}
+reg4 = smf.ols("DlnQ ~ DCLDD_avg + DHTDD_avg + C(month)", data).fit()
+
+reg4.summary()
+```
+
+```{python}
+reg4.get_robustcov_results(cov_type="HAC", maxlags=18).summary()
+```
+
+```{python}
+reg6 = smf.ols("DlnQ ~ DCLDD_avg + DHTDD_avg + C(month) + DlnQ.shift(1)", data).fit()
+reg6.summary()
+```
+
+```{python}
+reg7 = smf.ols(
+    """DlnQ ~ DCLDD_avg + DCLDD_avg.shift(1) +
+                          DCLDD_avg.shift(2) +
+                          DHTDD_avg + 
+                          DHTDD_avg.shift(1) +
+                          DHTDD_avg.shift(2) +
+                          C(month)""",
+    data,
+).fit()
+```
+
+```{python}
+stargazer = Stargazer([reg7])
+stargazer.covariate_order(
+    [
+        "DCLDD_avg",
+        "DCLDD_avg.shift(1)",
+        "DCLDD_avg.shift(2)",
+        "DHTDD_avg",
+        "DHTDD_avg.shift(1)",
+        "DHTDD_avg.shift(2)",
+    ]
+)
+stargazer
+```
+
+```{python}
+data["DDCLDD_avg"] = data["DCLDD_avg"] - data["DCLDD_avg"].shift()
+data["DDHTDD_avg"] = data["DHTDD_avg"] - data["DHTDD_avg"].shift()
+
+reg8 = smf.ols(
+    """DlnQ ~ DCLDD_avg.shift(2) +
+                          DHTDD_avg.shift(2) + 
+                          DDCLDD_avg + DDHTDD_avg + 
+                          DDCLDD_avg.shift(1) + DDHTDD_avg.shift(1) + 
+                          C(month)""",
+    data,
+).fit()
+```
+
+```{python}
+stargazer = Stargazer([reg8])
+stargazer.covariate_order(["DCLDD_avg.shift(2)", "DHTDD_avg.shift(2)"])
+stargazer.rename_covariates(
+    {
+        "DCLDD_avg.shift(2)": "ΔCD cumulative coeff",
+        "DHTDD_avg.shift(2)": "ΔHD cumulative coeff",
+    }
+)
+stargazer
+```
+
+

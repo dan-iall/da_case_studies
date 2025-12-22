@@ -1,0 +1,1147 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 16
+**CH16A Predicting apartment prices with random forest**
+
+using the airbnb dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from patsy import dmatrices
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import Lasso, LinearRegression
+from sklearn.metrics import root_mean_squared_error
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.tree import DecisionTreeRegressor
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+path = Path(os.getcwd())
+
+base_dir = str(path.parent.parent)
+
+data_in = os.path.join(base_dir, "da_case_studies/ch16-airbnb-random-forest/")
+data_out = os.path.join(base_dir, "da_case_studies/ch16-airbnb-random-forest/")
+output = os.path.join(base_dir, "da_case_studies/ch16-airbnb-random-forest/output/")
+func = os.path.join(base_dir, "da_case_studies/ch00-tech-prep/")
+
+sys.path.append(func)
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+## PART I
+#### Loading and preparing data 
+----------------------------------------------
+make sure you have run ch16-airbnb-prepare-london.ipynb before
+
+```{python}
+area = "london"
+data = pd.read_csv(data_in + "airbnb_" + area + "_workfile_adj.csv")
+data = data.loc[lambda x: x["price"].notna()]
+```
+
+```{python}
+data.isnull().sum().loc[lambda x: x > 0]
+```
+
+#### Sample definition and preparation
+--------------
+We focus on normal apartments, n<8
+
+```{python}
+data = data.loc[lambda x: x["n_accommodates"] < 8]
+```
+
+#### Basic descriptive stats
+-------------------------------------------
+
+```{python}
+data.describe()
+```
+
+```{python}
+data["price"].describe()
+```
+
+```{python}
+data["f_room_type"].value_counts()
+```
+
+```{python}
+data["f_property_type"].value_counts()
+```
+
+```{python}
+data["f_number_of_reviews"].value_counts()
+```
+
+### Create train and holdout samples
+-------------------------------------------
+
+train is where we do it all, incl CV
+
+### 🧝‍♀️ Frieren's Deciphering: [The Great Schism]
+**The Spell Anatomy:**
+* `train_test_split(...)` (**The Cleaver**)
+* `train_size=0.7`: Allocating 70% of mana to knowledge, 30% to validation.
+* `random_state=42`: **The Time-Lock.** Ensures the split is identical across dimensions (runs).
+
+**Mana Flow:** `(N, k)` $\to$ `(0.7N, k)` + `(0.3N, k)`
+**Arch-Mage Note:** Always set a random seed. Science without reproducibility is merely alchemy.
+
+```{python}
+data_train, data_holdout = train_test_split(data, train_size=0.7, random_state=42)
+```
+
+```{python}
+data_train.shape, data_holdout.shape
+```
+
+### 🧝‍♀️ Frieren's Deciphering: [Variable Grouping & Interaction Strategy]
+**The Spell Anatomy:**
+* `list` (**Buckets**) $\to$ Grouping features by "theme".
+* `[x for x in data...]` (**Auto-Gathering**) $\to$ Grabbing all dummy variables dynamically.
+* `"A:B"` (**The Binding**) $\to$ Explicit instruction for Linear Models to multiply features.
+
+**Mana Flow:** `Metadata` $\to$ `Feature Sets`
+**Arch-Mage Note:**
+*   **Linear Models:** Require `X1`, `X2` to be smart.
+*   **Tree Models:** Do NOT need `X1`, `X2`. They learn this natively. Adding them creates noise.
+
+```{python}
+# Basic Variables inc neighnourhood
+basic_vars = [
+    "n_accommodates",
+    "n_beds",
+    "n_days_since",
+    "f_property_type",
+    "f_room_type",
+    "f_bathroom",
+    "f_cancellation_policy",
+    "f_bed_type",
+    "f_neighbourhood_cleansed",
+]
+
+# reviews
+reviews = [
+    "n_number_of_reviews",
+    "flag_n_number_of_reviews",
+    "n_review_scores_rating",
+    "flag_review_scores_rating",
+]
+
+# Dummy variables
+amenities = [col for col in data if col.startswith("d_")]
+
+# interactions for the LASSO
+# from ch14
+X1 = [
+    "n_accommodates:f_property_type",
+    "f_room_type:f_property_type",
+    "f_room_type:d_familykidfriendly",
+    "d_airconditioning:f_property_type",
+    "d_cats:f_property_type",
+    "d_dogs:f_property_type",
+]
+# with boroughs
+X2 = [
+    "f_property_type:f_neighbourhood_cleansed",
+    "f_room_type:f_neighbourhood_cleansed",
+    "n_accommodates:f_neighbourhood_cleansed",
+]
+```
+
+```{python}
+type(data.f_bed_type)
+```
+
+```{python}
+type(X1)
+```
+
+```{python}
+
+PREDICTORS_1 = basic_vars
+PREDICTORS_2 = basic_vars + reviews + amenities
+PREDICTORS_E = basic_vars + reviews + amenities + X1 + X2
+```
+
+```{python}
+PREDICTORS_1
+```
+
+## PART II
+### RANDOM FORESTS 
+-------------------------------------------------------
+
+**Note:** n_estimators=500 in the R code.
+
+Here, we set it to 30 because the model runs mutch faster, and this does not change the results substantively here – however in other cases might.
+
+```{python}
+N_CORES = 7  # set number of cores in your machine to run the code in parallel
+N_CV = 5  # number of cross-validation folds
+RANDOM_STATE = 42  # set random seed for reproducibility
+```
+
+Model A: Basic Variables
+
+```{python}
+CATEGORICAL_COLUMNS = [col for col in PREDICTORS_1 if col.startswith("f_")]
+N_ESTIMATORS = 50
+TUNE_GRID = {"max_features": [5, 7, 9], "min_samples_split": [6, 11]}
+
+rf_model_1 = Pipeline(
+    [
+        (
+            "preprocessor",
+            ColumnTransformer(
+                [("cat", OneHotEncoder(drop=None), CATEGORICAL_COLUMNS)],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        (
+            "model",
+            GridSearchCV(
+                RandomForestRegressor(
+                    n_estimators=N_ESTIMATORS,
+                    criterion="squared_error",
+                    oob_score=True,
+                    n_jobs=N_CORES,
+                    random_state=RANDOM_STATE,
+                ),
+                TUNE_GRID,
+                cv=N_CV,
+                scoring="neg_root_mean_squared_error",
+                n_jobs=N_CORES,
+                verbose=3,
+            ),
+        ),
+    ],
+    verbose=True,
+)
+rf_model_1 = rf_model_1.fit(data_train[PREDICTORS_1], data_train["price"])
+```
+
+Model B: Basic Variables + Reviews + Amenities
+
+```{python}
+# 1. Identify Categorical Variables
+# We select all columns from our predictor list (PREDICTORS_1) that start with "f_".
+# In our dataset, "f_" denotes factor (categorical) variables like room type or borough[cite: 284].
+# Machine learning models require these to be numbers, not text strings.
+CATEGORICAL_COLUMNS = [col for col in PREDICTORS_1 if col.startswith("f_")]
+
+# 2. Set Global Model Parameters
+# We set the number of trees in the forest to 50.
+# Note: In a real production model, this would usually be 500 for stability.
+# We limit it to 50 here purely to make the code run faster for this exercise.
+N_ESTIMATORS = 50
+
+# 3. Define the Hyperparameter Grid (The "Tuning" Settings)
+# We are telling the computer to test different combinations of structural rules for the trees:
+# - 'max_features': How many variables to consider at each split (5, 7, or 9)[cite: 293].
+# - 'min_samples_split': The minimum node size (stop splitting if a node has fewer than 6 or 11 observations)[cite: 287].
+TUNE_GRID = {"max_features": [5, 7, 9], "min_samples_split": [6, 11]}
+
+# 4. Build the Pipeline
+# A Pipeline chains steps together so we don't have to manage them manually.
+rf_model_1 = Pipeline(
+    [
+        (
+            # Step A: Preprocessing
+            # This step transforms the data before the model sees it.
+            "preprocessor",
+            ColumnTransformer(
+                [
+                    # Apply OneHotEncoder to the categorical columns we identified above.
+                    # This converts "Room Type: Apartment" into a binary 1 or 0 (Dummy Variable).
+                    ("cat", OneHotEncoder(drop=None), CATEGORICAL_COLUMNS)
+                ],
+                # 'passthrough' means: Don't touch the other (numerical) columns; just pass them along.
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        (
+            # Step B: The Model with Cross-Validation
+            "model",
+            GridSearchCV(
+                # The Estimator: The actual Random Forest algorithm.
+                RandomForestRegressor(
+                    n_estimators=N_ESTIMATORS, # Use the 50 trees we defined.
+                    criterion="squared_error", # Minimize Squared Error (standard for regression).
+                    oob_score=True,            # Calculate Out-of-Bag error (a useful internal validation metric).
+                    n_jobs=N_CORES,            # Use multiple CPU cores to run faster.
+                    random_state=RANDOM_STATE, # Fix the random seed so results are reproducible.
+                ),
+                # The Grid: Pass the dictionary of settings we created in step 3.
+                TUNE_GRID,
+                # Cross-Validation: Split the training data into 5 folds (80% train / 20% test)[cite: 278].
+                cv=N_CV,
+                # Scoring: Evaluate success using Negative RMSE (Sklearn maximizes scores, so it uses negative error).
+                scoring="neg_root_mean_squared_error",
+                n_jobs=N_CORES,
+                verbose=3, # Print progress updates so we know it's working.
+            ),
+        ),
+    ],
+    verbose=True, # Show us when the pipeline moves from Step A to Step B.
+)
+
+# 5. Fit the Model
+# Run the entire pipeline on the training data.
+# This will: 1. Encode the variables, 2. Run the Grid Search (train multiple models), 3. Find the best hyperparameters.
+rf_model_1 = rf_model_1.fit(data_train[PREDICTORS_1], data_train["price"])
+```
+
+```{python}
+CATEGORICAL_COLUMNS = [col for col in PREDICTORS_2 if col.startswith("f_")]
+N_ESTIMATORS = 50
+TUNE_GRID = {"max_features": [8, 10, 12], "min_samples_split": [6, 11, 16]}
+
+rf_model_2 = Pipeline(
+    [
+        (
+            "preprocessor",
+            ColumnTransformer(
+                [("cat", OneHotEncoder(drop=None), CATEGORICAL_COLUMNS)],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        (
+            "model",
+            GridSearchCV(
+                RandomForestRegressor(
+                    n_estimators=N_ESTIMATORS,
+                    criterion="squared_error",
+                    oob_score=True,
+                    n_jobs=N_CORES,
+                    random_state=RANDOM_STATE,
+                ),
+                TUNE_GRID,
+                cv=N_CV,
+                scoring="neg_root_mean_squared_error",
+                n_jobs=N_CORES,
+                verbose=3,
+            ),
+        ),
+    ],
+    verbose=True,
+)
+rf_model_2 = rf_model_2.fit(data_train[PREDICTORS_2], data_train["price"])
+```
+
+### Table 16.1 Random forest RMSE by tuning parameters
+
+```{python}
+(
+    pd.DataFrame(rf_model_2[1].cv_results_)[
+        ["param_max_features", "param_min_samples_split", "mean_test_score"]
+    ]
+    .assign(
+        mean_test_score=lambda x: x["mean_test_score"] * -1,
+        Variables=lambda x: x["param_max_features"],
+        Min_nodes=lambda x: x["param_min_samples_split"] - 1,
+    )
+    .pivot(index="Min_nodes", columns="Variables", values="mean_test_score")
+    .round(2)
+)
+```
+
+```{python}
+pd.DataFrame(
+    {
+        "Min vars": [
+            rf_model_1[1].best_estimator_.max_features,
+            rf_model_2[1].best_estimator_.max_features,
+        ],
+        "Min nodes": [
+            rf_model_1[1].best_estimator_.min_samples_split - 1,
+            rf_model_2[1].best_estimator_.min_samples_split - 1,
+        ],
+    },
+    ["Model A", "Model B"],
+)
+```
+
+```{python}
+rf_model_1_rmse = rf_model_1[1].cv_results_["mean_test_score"].max() * -1
+rf_model_2_rmse = rf_model_2[1].cv_results_["mean_test_score"].max() * -1
+
+pd.DataFrame(
+    {"RMSE": [rf_model_1_rmse, rf_model_2_rmse]}, ["Model A", "Model B"]
+).round(2)
+```
+
+## PART III
+### MODEL DIAGNOSTICS 
+---
+
+### Variable importance
+
+```{python}
+rf_model_2_var_imp_df = (
+    pd.DataFrame(
+        [
+            rf_model_2[1].best_estimator_.feature_importances_,
+            rf_model_2[0].get_feature_names_out(),
+        ],
+        index=["imp", "varname"],
+    )
+    .T.assign(
+        factor=lambda x: x["varname"].str.startswith("f_"),
+        imp_percentage=lambda x: x["imp"] / x["imp"].sum(),
+        varname=lambda x: x.varname.str.replace(
+            "f_room_type_", "Room type: ", regex=False
+        )
+        .str.replace("f_neighbourhood_cleansed_", "Borough: ", regex=False)
+        .str.replace("f_cancellation_policy_", "Cancelation policy: ", regex=False)
+        .str.replace("f_bed_type_", "Bed type: ", regex=False)
+        .str.replace("f_property_type_", "Property type: ", regex=False)
+        .str.replace("f_bathroom_0", "No bathroom")
+        .str.replace("f_bathroom_1", "One bathroom")
+        .str.replace("f_bathroom_2", "More than 1 bathroom"),
+    )
+    .sort_values(by=["imp"], ascending=False)
+)
+```
+
+**1) full varimp plot, above a cutoff**
+
+```{python}
+cutoff = 0.013
+
+plot_df = rf_model_2_var_imp_df.loc[lambda x: x.imp > cutoff]
+da.plot_variable_importance(plot_df)
+```
+
+**2) full varimp plot, top 10 only**
+
+```{python}
+plot_df = rf_model_2_var_imp_df.head(10)
+da.plot_variable_importance(plot_df)
+```
+
+#### 3) grouped variable importance - keep binaries created off factors together
+
+First we do this by summing up the individual importances of factors - this is not correct, but it's in the first edition.
+
+Simply summing up the individual importances of each dummy could underestimate the importance of the qualitative variable. This occurs because omitting a single category might not significantly impact performance as the remaining correlated categories can still provide the model with the necessary information. 
+
+To address this issue, we need to assess the impact of including the entire categorical variable, not just the individual dummies. We create a pipeline which first encodes the categorical variables into dummy variables, then trains the model on the encoded data. Finally, we can employ a model-agnostic feature importance technique on this entire pipeline to estimate the contribution of each variable. This way, one categorical variableis either included or not during the calculation of variable importances.
+ 
+Model-agnostic feature importance techniques are methods used to determine the importance of features in a model, regardless of the model type. These techniques work by assessing the impact of each feature on the model's predictions without relying on the internal workings of the model. One such technique is permutation feature importance, which randomly shuffles the values of variables and measures how much the fit of the prediction is decreased.
+
+```{python}
+rf_model_2_var_imp_df_grouped = (
+    pd.DataFrame(
+        [
+            rf_model_2[1].best_estimator_.feature_importances_,
+            rf_model_2[0].get_feature_names_out(),
+        ],
+        index=["imp", "varname"],
+    )
+    .T.assign(
+        varname=lambda x: np.where(
+            x["varname"].str.contains("f_"),
+            x["varname"].str.split("_").str[:-1].str.join("_"),
+            x["varname"],
+        )
+    )
+    .groupby("varname")[["imp"]]
+    .sum()
+    .reset_index()
+    .assign(imp_percentage=lambda x: x["imp"] / x["imp"].sum())
+)
+```
+
+```{python}
+plot_df = rf_model_2_var_imp_df_grouped.sort_values(by=["imp"], ascending=False).head(
+    10
+)
+da.plot_variable_importance(
+    plot_df, title="Top 10 most important variable - factor variables summed"
+)
+```
+
+**OneHotEncoding and training the RandomForest model in a pipeline and calculating permutation importance - second edition**
+
+```{python}
+# This takes a while
+result = permutation_importance(
+    rf_model_2,
+    data_train[PREDICTORS_2],
+    data_train.price,
+    n_repeats=10,
+    random_state=45,
+    n_jobs=-1,
+)
+```
+
+```{python}
+grouped_imp = pd.DataFrame(
+    [result.importances_mean, data_train[PREDICTORS_2].columns],
+    index=["imp", "varname"],
+).T.assign(imp_percentage=lambda x: x["imp"] / x["imp"].sum())
+```
+
+```{python}
+plot_df = grouped_imp.sort_values(by=["imp"], ascending=False).head(10)
+da.plot_variable_importance(
+    plot_df,
+    title="Top 10 most important variable calculated with permutation importance",
+)
+```
+
+### Partial Dependence Plots 
+
+```{python}
+da.plot_partial_dependence(
+    rf_model_2,
+    data_holdout[PREDICTORS_2],
+    "n_accommodates",
+    "Accomodates (person)",
+)
+```
+
+```{python}
+da.plot_partial_dependence(
+    rf_model_2, data_holdout[PREDICTORS_2], "f_room_type", "Room type"
+)
+```
+
+### Subsample performance: RMSE / mean(y) 
+
+NOTE  we do this on the holdout set.
+
+```{python}
+data_holdout_w_prediction = data_holdout.assign(
+    predicted_price=rf_model_2.predict(data_holdout[PREDICTORS_2])
+)
+```
+
+create nice summary table of heterogeneity
+
+```{python}
+def calculate_rmse(groupby_obj):
+    return (
+        groupby_obj.apply(
+            lambda x: root_mean_squared_error(x.predicted_price, x.price),
+        )
+        .to_frame(name="rmse")
+        .assign(mean_price=groupby_obj.apply(lambda x: np.mean(x.price)).values)
+        .assign(rmse_norm=lambda x: x.rmse / x.mean_price)
+        .round(2)
+    )
+```
+
+```{python}
+# cheaper or more expensive flats - not used in book
+grouped_object = data_holdout_w_prediction.assign(
+    is_low_size=lambda x: np.where(x.n_accommodates <= 3, "small apt", "large apt")
+).groupby("is_low_size")
+accom_subset = calculate_rmse(grouped_object)
+```
+
+```{python}
+grouped_object = data_holdout_w_prediction.loc[
+    lambda x: x.f_neighbourhood_cleansed.isin(
+        [
+            "Westminster",
+            "Camden",
+            "Kensington and Chelsea",
+            "Tower Hamlets",
+            "Hackney",
+            "Newham",
+        ]
+    )
+].groupby("f_neighbourhood_cleansed")
+neightbourhood_subset = calculate_rmse(grouped_object)
+```
+
+```{python}
+grouped_object = data_holdout_w_prediction.loc[
+    lambda x: x.f_property_type.isin(["Apartment", "House"])
+].groupby("f_property_type")
+proptype_subset = calculate_rmse(grouped_object)
+```
+
+```{python}
+all_holdout = (
+    pd.DataFrame(
+        [
+            root_mean_squared_error(
+                data_holdout_w_prediction.price,
+                data_holdout_w_prediction.predicted_price,
+            ),
+            data_holdout_w_prediction.price.mean(),
+        ],
+        index=["rmse", "mean_price"],
+    )
+    .T.assign(rmse_norm=lambda x: x.rmse / x.mean_price)
+    .round(2)
+)
+all_holdout.index = ["All"]
+```
+
+```{python}
+type_rows = pd.DataFrame(
+    None,
+    index=["Apartment size", "Type", "Borough"],
+    columns=["rmse", "mean_price", "rmse_norm"],
+).fillna("")
+```
+
+#### Table 16.2 Performance across subsamples
+
+```{python}
+pd.concat(
+    [
+        type_rows.iloc[[0]],
+        accom_subset,
+        type_rows.iloc[[1]],
+        proptype_subset,
+        type_rows.iloc[[2]],
+        neightbourhood_subset,
+        all_holdout,
+    ]
+)
+```
+
+### SHAP
+
+```{python}
+import shap
+```
+
+Calculate SHAP values for our best model
+
+Since shap does not accept categorical values, we do the encoding before passing the matrix to shap
+
+**NOTE:** Again, we do this on the holdout set!
+
+```{python}
+X_holdout = pd.DataFrame(
+    rf_model_2[0].transform(data_holdout[PREDICTORS_2]),
+    columns=rf_model_2[0].get_feature_names_out(),
+)
+```
+
+```{python}
+explainer = shap.Explainer(rf_model_2[1].predict, X_holdout, seed=RANDOM_STATE)
+shap_values = explainer(X_holdout)
+```
+
+#### Beeswarm plot of SHAP values
+
+The beeswarm plot is designed to display an information-dense summary of how the top features in a dataset impact the model’s output. Each instance the given explanation is represented by a single dot on each feature row. The x position of the dot is determined by the SHAP value of that feature, and dots “pile up” along each feature row to show density. Color is used to display the original value of a feature. In the plot below we can see that Entire home/apt is the most important feature on average, and than Entire home/apt-s are more expensive.
+
+
+```{python}
+shap.plots.beeswarm(
+    shap_values, max_display=15, color=plt.get_cmap("viridis_r"), show=True
+)
+```
+
+Can do the same with **SHAP values scaled log**. This might come handy, when the distribution of SHAP values are skewed
+
+```{python}
+shap.plots.beeswarm(
+    shap_values, max_display=15, log_scale=True, color=plt.get_cmap("viridis_r")
+)
+```
+
+You can also display the **SHAP values in absolute**, on a beeswarm plot
+
+```{python}
+shap.plots.beeswarm(shap_values.abs, color=da.color[0])
+```
+
+Or on a barplot
+
+```{python}
+shap.plots.bar(shap_values)
+```
+
+#### Explanining predictions for a unit of observation (airbnb)
+
+Let's look at SHAP values for the third observation in the holdout set. 
+
+- .values array contains the shap values
+- .base_values contains the expected value (intercept/constant in OLS terms)
+- .data contains the feature values for the observation
+
+```{python}
+shap_values[2]
+```
+
+#### Waterfall plot
+The waterfall plot shows how the sum of all the SHAP values equals the difference between the prediction $f(x)$ and the expected value $E[f(x)]$. Waterfall plots are designed to display explanations for individual predictions, so they expect a single row of an Explanation object as input. The bottom of a waterfall plot starts as the expected value of the model output, and then each row shows how the positive (red) or negative (blue) contribution of each feature moves the value from the expected model output over the background dataset to the model output for this prediction.
+
+```{python}
+shap.plots.waterfall(shap_values[2])
+```
+
+Same plot, but SHAP values for another observation below.
+
+Note, that for a same predictor (eg. f_room_type_Private room = 0) the SHAP values are different for the airbnb above (+5.29) and above (+6.88).
+
+```{python}
+shap.plots.waterfall(shap_values[3])
+```
+
+### Lime
+
+```{python}
+continous_and_ordinal_vars = [col for col in PREDICTORS_2 if col.startswith("n_")]
+categorical_vars = [col for col in PREDICTORS_2 if not col.startswith("n_")]
+```
+
+```{python}
+encoder = ColumnTransformer(
+    [("c", OrdinalEncoder(), categorical_vars)],
+    remainder="passthrough",
+    verbose_feature_names_out=False,
+).fit(data_train[PREDICTORS_2])
+
+X_train_lime = pd.DataFrame(
+    encoder.transform(data_train[PREDICTORS_2]), columns=encoder.get_feature_names_out()
+)
+X_holdout_lime = pd.DataFrame(
+    encoder.transform(data_holdout[PREDICTORS_2]),
+    columns=encoder.get_feature_names_out(),
+)
+
+numerical_indices = [
+    X_train_lime.columns.get_loc(col) for col in continous_and_ordinal_vars
+]
+categorical_indices = [X_train_lime.columns.get_loc(col) for col in categorical_vars]
+
+categorical_names = {
+    idx: cat
+    for idx, cat in zip(categorical_indices, encoder.transformers_[0][1].categories_)
+}
+```
+
+```{python}
+rf_best_pipeline = Pipeline(
+    [
+        (
+            "preprocess",
+            ColumnTransformer(
+                [("cat", OneHotEncoder(), categorical_indices)],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        ("regressor", rf_model_2[1].best_estimator_),  # best model
+    ]
+)
+```
+
+```{python}
+rf_best_pipeline.fit(X_train_lime, data_train.price)
+```
+
+```{python}
+predict_fn = lambda x: rf_best_pipeline.predict(x).astype(float)
+```
+
+```{python}
+from lime.lime_tabular import LimeTabularExplainer
+
+explainer = LimeTabularExplainer(
+    X_holdout_lime.to_numpy(),
+    feature_names=X_holdout_lime.columns.tolist(),
+    categorical_features=categorical_indices,
+    categorical_names=categorical_names,
+    mode="regression",
+    random_state=1237,
+)
+```
+
+```{python}
+instance = X_holdout_lime.iloc[[2]]
+```
+
+```{python}
+from sklearn.linear_model import Ridge
+
+exp = explainer.explain_instance(
+    instance.to_numpy()[0],
+    predict_fn,
+    num_features=20,
+    num_samples=1000,
+    distance_metric="euclidean",
+    model_regressor=Ridge(
+        alpha=1, fit_intercept=True, random_state=explainer.random_state
+    ),
+)
+
+exp.as_pyplot_figure()
+plt.show()
+```
+
+```{python}
+exp.predicted_value
+```
+
+```{python}
+exp.local_pred[0]
+```
+
+```{python}
+exp.intercept[0]
+```
+
+```{python}
+sum([i[1] for i in exp.as_list()])
+```
+
+### Interactions
+
+Look at interactions from `ch14-airbnb-reg`
+
+```{python}
+(
+    "f_room_type*d_familykidfriendly",
+    "f_room_type*f_property_type",
+    "f_property_type*d_airconditioning",
+    "f_property_type*d_cats",
+    "f_property_type*d_dogs",
+)
+```
+
+To help reveal these interactions we can color by another feature. If we pass the whole explanation tensor to the color argument **the scatter plot will pick the best feature to color by.**
+
+Get best proposed interaction by SHAP values for room types. Note that the grey area on the plot corresponds to the distribution of the feature in the data.
+
+```{python}
+room_types = [
+    ("f_room_type_Entire home/apt", "Entire home/apt"),
+    ("f_room_type_Private room", "Private room"),
+    ("f_room_type_Shared room", "Shared room"),
+]
+
+da.plot_shap_interactions(room_types, shap_values)
+```
+
+It turned out, that for the `f_room_type` variable the best interaction (at least based on RF and SHAP) would be the `f_bathroom` which we did not choose in ch14.
+
+Let's check for `d_airconditioning`, `d_dogs` and `d_cats`.
+
+```{python}
+features = [
+    ("d_airconditioning", "Air Conditioning"),
+    ("d_cats", "Cats"),
+    ("d_dogs", "Dogs"),
+]
+
+da.plot_shap_interactions(features, shap_values)
+```
+
+Take a look at a discrete feature, `n_accommodates`
+
+```{python}
+shap.plots.scatter(
+    shap_values[:, "n_accommodates"], color=shap_values, cmap=plt.get_cmap("viridis_r")
+)
+```
+
+## PART IV
+### HORSERACE: compare with other models 
+-----------------------------------------------
+
+1. OLS with dummies for area
+
+ using model B
+
+```{python}
+def get_cv_score(model):
+    return min(model.cv_results_["mean_test_score"] * -1)
+```
+
+```{python}
+ols_model_cv = Pipeline(
+    [
+        (
+            "encoding",
+            ColumnTransformer(
+                [("cat", OneHotEncoder(drop="first"), CATEGORICAL_COLUMNS)],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        (
+            "model",
+            GridSearchCV(
+                LinearRegression(),
+                {},
+                cv=N_CV,
+                scoring="neg_root_mean_squared_error",
+                verbose=3,
+            ),
+        ),
+    ]
+)
+```
+
+```{python}
+ols_model_cv.fit(data_train[PREDICTORS_2], data_train["price"])
+ols_rmse = get_cv_score(ols_model_cv[1])
+```
+
+```{python}
+ols_model_coeffs_df = pd.DataFrame(
+    ols_model_cv[1].best_estimator_.coef_.tolist(),
+    index=ols_model_cv[0].get_feature_names_out(),
+    columns=["ols_coefficient"],
+).round(1)
+```
+
+```{python}
+ols_model_coeffs_df
+```
+
+2.  LASSO
+
+using extended model w interactions
+
+```{python}
+lasso_model_cv = Pipeline(
+    [
+        ("scaler", StandardScaler()),
+        (
+            "model",
+            GridSearchCV(
+                Lasso(fit_intercept=True, random_state=RANDOM_STATE),
+                {"alpha": np.arange(0.01, 0.26, 0.01)},
+                cv=N_CV,
+                scoring="neg_root_mean_squared_error",
+                verbose=3,
+                n_jobs=N_CORES,
+            ),
+        ),
+    ]
+)
+```
+
+```{python}
+y, X = dmatrices(
+    "price ~ " + " + ".join(PREDICTORS_E), data_train, return_type="dataframe"
+)
+lasso_model_cv.fit(X, y)
+```
+
+```{python}
+lasso_rmse = get_cv_score(lasso_model_cv[1])
+```
+
+```{python}
+pd.DataFrame(
+    lasso_model_cv[1].best_estimator_.coef_.tolist(),
+    index=X.columns,
+    columns=["lasso_coefficient"],
+).loc[lambda x: x.lasso_coefficient != 0].round(3)
+```
+
+3. CART model
+
+```{python}
+preprocessor = ColumnTransformer(
+    [("cat", OneHotEncoder(), CATEGORICAL_COLUMNS)],
+    remainder="passthrough",
+    verbose_feature_names_out=False,
+)
+```
+
+```{python}
+X = preprocessor.fit_transform(data_train[PREDICTORS_2])
+y = data_train["price"]
+```
+
+```{python}
+cart_model = DecisionTreeRegressor(random_state=2018)
+```
+
+```{python}
+# Get potential ccp_alpha parameters
+
+path = cart_model.cost_complexity_pruning_path(X, y)
+```
+
+```{python}
+# apply random search to select a "best" alpha
+# RandomizedSearchCV does not calculate all potential alphas, just a random subset of 100 alphas
+
+cart_model_cv = RandomizedSearchCV(
+    cart_model,
+    {"ccp_alpha": path["ccp_alphas"][:-1]},
+    cv=N_CV,
+    n_iter=100,
+    scoring="neg_root_mean_squared_error",
+    verbose=3,
+    n_jobs=N_CORES,
+)
+
+
+cart_model_cv.fit(X, y)
+```
+
+```{python}
+cart_rmse = get_cv_score(cart_model_cv)
+```
+
+4. GBM
+
+**NOTE:** These models run for a **very long time**
+
+```{python}
+TUNE_GRID = {"n_estimators": [i for i in range(200, 500, 50)], "max_depth": [1, 5, 10]}
+
+gbm_model_cv = Pipeline(
+    [
+        (
+            "preprocessor",
+            ColumnTransformer(
+                [("cat", OneHotEncoder(drop=None), CATEGORICAL_COLUMNS)],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        (
+            "model",
+            GridSearchCV(
+                GradientBoostingRegressor(
+                    learning_rate=0.1,
+                    criterion="squared_error",
+                    min_samples_split=20,
+                    random_state=RANDOM_STATE,
+                ),
+                TUNE_GRID,
+                cv=N_CV,
+                scoring="neg_root_mean_squared_error",
+                n_jobs=N_CORES,
+                verbose=3,
+            ),
+        ),
+    ],
+    verbose=True,
+)
+gbm_model_cv = gbm_model_cv.fit(data_train[PREDICTORS_2], data_train["price"])
+```
+
+```{python}
+gbm_rmse = get_cv_score(gbm_model_cv[1])
+```
+
+the next will be in final model, loads of tuning
+
+```{python}
+TUNE_GRID = {
+    "n_estimators": [i for i in range(50, 500, 50)],
+    "max_depth": [1, 5, 10],
+    "learning_rate": [0.02, 0.05, 0.1, 0.15, 0.2],
+    "min_samples_split": [5, 10, 20, 30],
+}
+
+
+gbm_model_cv_broad = Pipeline(
+    [
+        (
+            "preprocessor",
+            ColumnTransformer(
+                [("cat", OneHotEncoder(drop=None), CATEGORICAL_COLUMNS)],
+                remainder="passthrough",
+                verbose_feature_names_out=False,
+            ),
+        ),
+        (
+            "model",
+            GridSearchCV(
+                GradientBoostingRegressor(
+                    criterion="squared_error", random_state=RANDOM_STATE
+                ),
+                TUNE_GRID,
+                cv=N_CV,
+                scoring="neg_root_mean_squared_error",
+                n_jobs=N_CORES,
+                verbose=3,
+            ),
+        ),
+    ],
+    verbose=True,
+)
+gbm_model_cv_broad = gbm_model_cv_broad.fit(
+    data_train[PREDICTORS_2], data_train["price"]
+)
+```
+
+```{python}
+gbm_broad_rmse = get_cv_score(gbm_model_cv_broad[1])
+```
+
+### Table 16.3 Predictive performance of different models
+
+```{python}
+pd.DataFrame(
+    {
+        "Model": [
+            "Linear regression (OLS)",
+            "Linear regression (LASSO)",
+            "Regression Tree (CART)",
+            "Random forest (basic tuning)",
+            "Random forest (autotuned)",
+            "GBM (basic tuning)",
+            "GBM (broad tuning)",
+        ],
+        "RMSE": [
+            ols_rmse,
+            lasso_rmse,
+            cart_rmse,
+            rf_model_1_rmse,
+            rf_model_2_rmse,
+            gbm_rmse,
+            gbm_broad_rmse,
+        ],
+    }
+).round(1)
+```
+
+

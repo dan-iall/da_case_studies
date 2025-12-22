@@ -1,0 +1,132 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 07
+**CH07 OLS fit simulation**
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as smf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+output = dirname + "da_case_studies/ch07-ols-simulation/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+Set random seed
+
+```{python}
+rng = np.random.default_rng(1458)
+```
+
+Set sample size
+
+```{python}
+n = 100
+```
+
+xvar - uniformly distributed x, [0,4]
+
+```{python}
+xvar = rng.uniform(0, 4, n)
+```
+
+yvar - y  = a + bx + u (u normally distributed)
+
+```{python}
+a = 2
+b = 0.5
+sigmau = 0.7
+yvar = a + b * xvar + rng.normal(0, sigmau, size=n)
+```
+
+```{python}
+ols = pd.DataFrame({"yvar": yvar, "xvar": xvar})
+```
+
+```{python}
+reg = smf.ols(formula="yvar~xvar", data=ols).fit()
+reg.summary()
+```
+
+```{python}
+mean_x = round(np.mean(xvar), 2)
+mean_y = round(np.mean(yvar), 2)
+
+sns.regplot(
+    data=ols,
+    x="xvar",
+    y="yvar",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+plt.plot([mean_x, mean_x], [0, 400], linewidth=1, color=da.color[2], linestyle="dashed")
+
+plt.plot([0, 7], [mean_y, mean_y], linewidth=1, color=da.color[2], linestyle="dashed")
+
+
+plt.annotate(
+    "Average $x$",
+    xy=(2, 4),
+    xytext=(0.7, 3.96),
+    arrowprops=dict(color="black", arrowstyle="->"),
+    fontsize=11,
+)
+
+plt.annotate(
+    "Average $y$",
+    xy=(0.5, 3),
+    xytext=(0.23, 3.6),
+    arrowprops=dict(color="black", arrowstyle="->"),
+    fontsize=11,
+)
+plt.xlabel("Simulated $x$ variable", fontsize=12)
+plt.ylabel("Simulated $y$ variable", fontsize=12)
+plt.xlim(-0.1, 4.1)
+plt.xticks(np.arange(0, 4.1, 1))
+plt.ylim(-0.1, 5.1)
+plt.yticks(np.arange(0, 5.1, 1))
+plt.show()
+```
+
+

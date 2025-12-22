@@ -1,0 +1,1263 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+# Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 17
+
+**CH17A Predicting firm exit**
+
+Using the bisnode-firms dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+import pyfixest as pf
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+import patsy
+import sklearn.metrics as metrics
+import statsmodels.formula.api as smf
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.metrics import (
+    confusion_matrix,
+    mean_squared_error,
+    roc_auc_score,
+    roc_curve,
+)
+from sklearn.model_selection import GridSearchCV, KFold, train_test_split
+from sklearn.preprocessing import StandardScaler
+from statsmodels.tools.eval_measures import rmse
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+path = os.getcwd()
+base_dir = path.split("da_case_studies")[0]
+
+# Set the location of your data directory
+data_dir = base_dir + "da_data_repo"
+
+# location folders
+data_in = os.path.join(data_dir, "bisnode-firms/clean/")
+data_out = os.path.join(data_dir, "bisnode-firms/")
+output = os.path.join(data_out, "output/")
+func = os.path.join(base_dir, "da_case_studies/ch00-tech-prep/")
+sys.path.append(func)
+
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+## Import data
+
+```{python}
+# !!! make sure you have run ch17-firm-exit-data-prep.ipynb before
+data = pd.read_csv(data_out + "bisnode_firms_clean.csv")
+```
+
+```{python}
+data.describe()
+```
+
+## Define helper functions
+
+```{python}
+def regression_results(y_true, y_pred):
+
+    # Regression metrics
+    explained_variance = metrics.explained_variance_score(y_true, y_pred)
+    mean_absolute_error = metrics.mean_absolute_error(y_true, y_pred)
+    mse = metrics.mean_squared_error(y_true, y_pred)
+    median_absolute_error = metrics.median_absolute_error(y_true, y_pred)
+    r2 = metrics.r2_score(y_true, y_pred)
+
+    print("explained_variance: ", round(explained_variance, 4))
+    print("r2: ", round(r2, 4))
+    print("MAE: ", round(mean_absolute_error, 4))
+    print("MSE: ", round(mse, 4))
+    print("RMSE: ", round(np.sqrt(mse), 4))
+
+
+def coef_matrix(X, model):
+
+    coef_matrix = pd.concat(
+        [pd.DataFrame(X.columns), pd.DataFrame(np.transpose(model.coef_))], axis=1
+    )
+    coef_matrix.columns = ["variable", "coefficient"]
+    coef_matrix = coef_matrix.append(
+        {"variable": "Intercept", "coefficient": model.intercept_},
+        ignore_index=True,
+    )
+    return coef_matrix
+
+
+def cv_summary(lambdas, C_values, model):
+    d = {
+        "lambdas": lambdas,
+        "C_values": C_values,
+        "mean_cv_score": model.scores_[1].mean(axis=0),
+    }
+    return pd.DataFrame(data=d)
+
+
+def sigmoid_array(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def generate_fold_prediction(model, X, fold, param_index):
+    fold_coef = model.coefs_paths_[1][fold, param_index, :]
+    return sigmoid_array(
+        np.dot(X, np.transpose(fold_coef)[:-1]) + np.transpose(fold_coef)[-1]
+    )
+
+
+def create_loss_plot(all_coords, optimal_threshold, curr_exp_loss):
+    all_coords_copy = all_coords.copy()
+    all_coords_copy["loss"] = (
+        all_coords_copy.false_pos * FP + all_coords_copy.false_neg * FN
+    ) / all_coords_copy.n
+
+    t = optimal_threshold
+    l = curr_exp_loss
+
+    # Plot loss curve
+    sns.lineplot(x=all_coords_copy["thresholds"], y=all_coords_copy["loss"])
+
+    # Vertical line for optimal threshold
+    plt.axvline(x=t, linestyle="--")
+
+    # Annotations
+    plt.text(
+        t - 0.03,
+        all_coords_copy["loss"].max() - 0.7,
+        f"Best threshold: {round(t, 2)}",
+        color=da.color[1],
+        rotation=90,
+        fontsize=8,
+    )
+    plt.text(t + 0.06, l, f"{round(l, 2)}", fontsize=8)
+
+    # Labels and limits
+    plt.xlabel("Thresholds")
+    plt.ylabel("Expected loss")
+    plt.xlim(-0.01, 1.01)
+    plt.xticks(np.arange(0, 1.1, 0.1))
+
+    # Style
+    plt.grid(True, linestyle="--", alpha=0.6)
+
+    plt.show()
+
+
+def create_roc_plot(y_true, y_pred):
+    fpr, tpr, thresholds = roc_curve(y_true, y_pred)
+
+    # Plot ROC curve
+    sns.lineplot(x=fpr, y=tpr, linewidth=1)
+
+    # Fill area under curve
+    plt.fill_between(fpr, tpr, alpha=0.3, color="mediumaquamarine")
+
+    # Diagonal reference line
+    plt.plot([0, 1], [0, 1], linestyle="dotted", color="black", linewidth=0.9)
+
+    # Labels and limits
+    plt.xlabel("False Positive Rate (1-Specificity)")
+    plt.ylabel("True Positive Rate (Sensitivity)")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.xticks(np.arange(0, 1.1, 0.1))
+    plt.yticks(np.arange(0, 1.1, 0.1))
+
+    # Style
+    sns.despine()
+    plt.grid(True, linestyle="--", alpha=0.6)
+
+    plt.show()
+
+
+def create_roc_plot_with_optimal(all_coords, optimal_threshold):
+    all_coords_copy = all_coords.copy()
+    all_coords_copy["sp"] = 1 - all_coords_copy.true_neg / all_coords_copy.neg
+    all_coords_copy["se"] = all_coords_copy.true_pos / all_coords_copy.pos
+
+    best_coords = all_coords_copy[all_coords_copy.thresholds == optimal_threshold]
+    sp = best_coords.sp.values[0]
+    se = best_coords.se.values[0]
+
+    # Plot ROC curve
+    sns.lineplot(x=all_coords_copy["sp"], y=all_coords_copy["se"])
+
+    # Highlight optimal threshold point
+    plt.scatter(sp, se, color="black", s=10)
+    plt.text(sp, se + 0.03, f"{round(sp, 2)}, {round(se, 2)}", fontsize=10, ha="center")
+
+    # Fill area under curve
+    plt.fill_between(
+        all_coords_copy["sp"],
+        all_coords_copy["se"],
+        alpha=0.3,
+        color="mediumaquamarine",
+    )
+
+    # Diagonal reference line
+    plt.plot([0, 1], [0, 1], linestyle="dotted", color="black", linewidth=0.9)
+
+    # Labels and limits
+    plt.xlabel("False Positive Rate (1-Specificity)")
+    plt.ylabel("True Positive Rate (Sensitivity)")
+    plt.xlim(0, 1.01)
+    plt.ylim(0, 1.01)
+    plt.xticks(np.arange(0, 1.1, 0.1))
+    plt.yticks(np.arange(0, 1.1, 0.1))
+
+    # Style
+    sns.despine()
+    plt.grid(True, linestyle="--", alpha=0.6)
+
+    plt.show()
+```
+
+## Model building
+
+### Define variable sets 
+
+ Main firm variables
+
+```{python}
+rawvars = [
+    "curr_assets",
+    "curr_liab",
+    "extra_exp",
+    "extra_inc",
+    "extra_profit_loss",
+    "fixed_assets",
+    "inc_bef_tax",
+    "intang_assets",
+    "inventories",
+    "liq_assets",
+    "material_exp",
+    "personnel_exp",
+    "profit_loss_year",
+    "sales",
+    "share_eq",
+    "subscribed_cap",
+]
+```
+
+Further financial variables
+
+```{python}
+qualityvars = ["balsheet_flag", "balsheet_length", "balsheet_notfullyear"]
+engvar = [
+    "total_assets_bs",
+    "fixed_assets_bs",
+    "liq_assets_bs",
+    "curr_assets_bs",
+    "share_eq_bs",
+    "subscribed_cap_bs",
+    "intang_assets_bs",
+    "extra_exp_pl",
+    "extra_inc_pl",
+    "extra_profit_loss_pl",
+    "inc_bef_tax_pl",
+    "inventories_pl",
+    "material_exp_pl",
+    "profit_loss_year_pl",
+    "personnel_exp_pl",
+]
+engvar2 = [
+    "extra_profit_loss_pl_quad",
+    "inc_bef_tax_pl_quad",
+    "profit_loss_year_pl_quad",
+    "share_eq_bs_quad",
+]
+```
+
+ Flag variables
+
+```{python}
+engvar3 = []
+for col in data.columns:
+    if (
+        col.endswith("flag_low")
+        or col.endswith("flag_high")
+        or col.endswith("flag_error")
+        or col.endswith("flag_zero")
+    ):
+        engvar3.append(col)
+```
+
+Growth variables
+
+```{python}
+d1 = [
+    "d1_sales_mil_log_mod",
+    "d1_sales_mil_log_mod_sq",
+    "flag_low_d1_sales_mil_log",
+    "flag_high_d1_sales_mil_log",
+]
+```
+
+Human capital related variables
+
+```{python}
+hr = [
+    "female",
+    "ceo_age",
+    "flag_high_ceo_age",
+    "flag_low_ceo_age",
+    "flag_miss_ceo_age",
+    "ceo_count",
+    "labor_avg_mod",
+    "flag_miss_labor_avg",
+    "foreign_management",
+]
+```
+
+ Firms history related variables
+
+```{python}
+firm = ["age", "age2", "new", "C(ind2_cat)", "C(m_region_loc)", "C(urban_m)"]
+```
+
+interactions for logit, LASSO
+
+```{python}
+interactions1 = [
+    "C(ind2_cat)*age",
+    "C(ind2_cat)*age2",
+    "C(ind2_cat)*d1_sales_mil_log_mod",
+    "C(ind2_cat)*sales_mil_log",
+    "C(ind2_cat)*ceo_age",
+    "C(ind2_cat)*foreign_management",
+    "C(ind2_cat)*female",
+    "C(ind2_cat)*C(urban_m)",
+    "C(ind2_cat)*labor_avg_mod",
+]
+interactions2 = [
+    "sales_mil_log*age",
+    "sales_mil_log*female",
+    "sales_mil_log*profit_loss_year_pl",
+    "sales_mil_log*foreign_management",
+]
+```
+
+## Model setups
+
+1. Simple logit models
+
+```{python}
+M1 = [
+    "sales_mil_log",
+    "sales_mil_log_sq",
+    "d1_sales_mil_log_mod",
+    "profit_loss_year_pl",
+    "C(ind2_cat)",
+]
+M2 = [
+    "sales_mil_log",
+    "sales_mil_log_sq",
+    "d1_sales_mil_log_mod",
+    "profit_loss_year_pl",
+    "fixed_assets_bs",
+    "share_eq_bs",
+    "curr_liab_bs ",
+    "curr_liab_bs_flag_high ",
+    "curr_liab_bs_flag_error",
+    "age",
+    "foreign_management",
+    "C(ind2_cat)",
+]
+M3 = ["sales_mil_log", "sales_mil_log_sq"] + firm + engvar + d1
+M4 = (
+    ["sales_mil_log", "sales_mil_log_sq"]
+    + firm
+    + engvar
+    + engvar2
+    + engvar3
+    + d1
+    + hr
+    + qualityvars
+)
+M5 = (
+    ["sales_mil_log", "sales_mil_log_sq"]
+    + firm
+    + engvar
+    + engvar2
+    + engvar3
+    + d1
+    + hr
+    + qualityvars
+    + interactions1
+    + interactions2
+)
+```
+
+2. logit+LASSO
+
+```{python}
+logit_lasso_vars = (
+    ["sales_mil_log", "sales_mil_log_sq"]
+    + engvar
+    + engvar2
+    + engvar3
+    + d1
+    + hr
+    + firm
+    + qualityvars
+    + interactions1
+    + interactions2
+)
+```
+
+3. CART and RF (no interactions, no modified features)
+
+```{python}
+rfvars = ["sales_mil", "d1_sales_mil_log"] + rawvars + hr + firm + qualityvars
+```
+
+## Quick reminder about probability models
+
+ Linear probability model
+
+```{python}
+ols_modelx2 = smf.ols("default~" + "+".join(M2), data).fit(cov_type="HC1")
+ols_modelx2.summary()
+```
+
+```{python}
+logit_modelx2 = smf.logit("default~" + "+".join(M2), data).fit()
+logit_modelx2.summary()
+```
+
+With Logit we need to calculate average marginal effects (dy/dx) to be able to interpret the coefficients (under some assumptions...)
+
+```{python}
+logit_modelx2.get_margeff().summary()
+```
+
+## 0. Separate train and holdout data
+
+```{python}
+data_train, data_holdout = train_test_split(data, train_size=0.8, random_state=42)
+```
+
+```{python}
+print("Total")
+print(data["default"].value_counts(normalize=True))
+print("Train")
+print(data_train["default"].value_counts(normalize=True))
+print("Holdout")
+print(data_holdout["default"].value_counts(normalize=True))
+```
+
+## 1. Predict probabilities with logit and Lasso with CV
+
+Specify 5 fold cross-validation method
+
+```{python}
+k = KFold(n_splits=5, shuffle=True, random_state=42)
+```
+
+### a) cross validate logit models
+
+Set up X-vars
+
+```{python}
+logit_model_vars = [M1, M2, M3, M4, M5]
+```
+
+Set up Logit model object
+
+No regularisation needed so setting the paremeter to very high value
+
+```{python}
+C_value_logit = [1e20]
+```
+
+```{python}
+logit_models = dict()
+CV_RMSE_folds = dict()
+
+for i, model_vars in enumerate(logit_model_vars):
+
+    model_equation = "default~" + "+".join(model_vars)
+    y_train, X_train = patsy.dmatrices(model_equation, data_train)
+
+    LRCV_brier = LogisticRegressionCV(
+        Cs=C_value_logit,
+        cv=k,
+        refit=True,
+        scoring="neg_brier_score",
+        solver="newton-cg",
+        tol=1e-7,
+        random_state=42,
+    )
+
+    logit_models["M" + str(i + 1)] = LRCV_brier.fit(X_train, y_train)
+
+    # Calculate RMSE on test for each fold
+    CV_RMSE_folds["M" + str(i + 1)] = np.sqrt(
+        -1 * logit_models["M" + str(i + 1)].scores_[1].ravel()
+    )
+```
+
+```{python}
+pd.DataFrame(CV_RMSE_folds)
+```
+
+### b) Logit + LASSO
+
+```{python}
+model_equation = "default~" + "+".join(logit_lasso_vars)
+y_train, X_train = patsy.dmatrices(model_equation, data_train)
+```
+
+Normalise X vars for Lasso
+
+```{python}
+normalized_logitvars = pd.DataFrame(
+    StandardScaler().fit_transform(X_train),
+    columns=X_train.design_info.column_names,
+)
+```
+
+Set regularization parameters
+
+```{python}
+lambdas = list(10 ** np.arange(-1, -4.01, -1 / 3))
+n_obs = normalized_logitvars.shape[0] * 4 / 5
+C_values = [
+    1 / (l * n_obs) for l in lambdas
+]  # Cs are the inverse of regularization strength
+```
+
+Initialize and fit Logit Lasso
+
+```{python}
+logLasso_brier = LogisticRegressionCV(
+    Cs=C_values,
+    penalty="l1",
+    cv=k,
+    refit=True,
+    scoring="neg_brier_score",
+    solver="liblinear",
+    random_state=42,
+)
+
+logit_models["LASSO"] = logLasso_brier.fit(normalized_logitvars, y_train)
+```
+
+See CV-fold RMSE-s (negative brier score)
+
+```{python}
+cv_summary_lasso = cv_summary(lambdas, C_values, logit_models["LASSO"])
+cv_summary_lasso["mean_cv_score"] = np.sqrt(cv_summary_lasso["mean_cv_score"] * -1)
+cv_summary_lasso
+```
+
+Save best lambda's index for later use
+
+```{python}
+best_lambda_i = cv_summary_lasso["mean_cv_score"].idxmin()
+```
+
+Extract CV test RMSE for the Lasso with best lambda
+
+```{python}
+CV_RMSE_folds["LASSO"] = np.sqrt(
+    -1 * logit_models["LASSO"].scores_[1][:, best_lambda_i]
+)
+```
+
+## 2.  AUC, Calibration Curve, Confusion Matrix, ROC
+
+0. Calculate AUC for folds
+
+
+First, for logits
+
+```{python}
+CV_AUC_folds = dict()
+for i, model_vars in enumerate(logit_model_vars):
+
+    model_equation = "default~" + "+".join(model_vars)
+    y_train, X_train = patsy.dmatrices(model_equation, data_train)
+
+    LRCV_auc = LogisticRegressionCV(
+        Cs=C_value_logit,
+        cv=k,
+        refit=True,
+        scoring="roc_auc",
+        solver="newton-cg",
+        tol=1e-7,
+        random_state=42,
+    )
+
+    logit_models["M" + str(i + 1)] = LRCV_auc.fit(X_train, y_train)
+
+    # Calculate AUC on test for each fold
+    CV_AUC_folds["M" + str(i + 1)] = logit_models["M" + str(i + 1)].scores_[1].ravel()
+```
+
+For Lasso
+
+```{python}
+logLasso_auc = LogisticRegressionCV(
+    Cs=C_values,
+    penalty="l1",
+    cv=k,
+    refit=True,
+    scoring="roc_auc",
+    solver="liblinear",
+    random_state=42,
+)
+logLasso_auc_fitted = logLasso_auc.fit(normalized_logitvars, y_train)
+
+CV_AUC_folds["LASSO"] = logLasso_auc_fitted.scores_[1][
+    :, cv_summary_lasso["mean_cv_score"].idxmin()
+]
+```
+
+Put a summary frame together
+
+```{python}
+model_fits = pd.DataFrame(logit_models, index=["Model fit"]).T
+
+summary = (
+    model_fits["Model fit"]
+    .apply(lambda x: x.n_features_in_)
+    .to_frame(name="Number of Coefficients")
+)
+
+summary.loc["LASSO", "Number of Coefficients"] = len(
+    [i for i in model_fits.loc["LASSO"].values[0].coef_[0] if i != 0]
+)
+
+summary["CV RMSE"] = pd.DataFrame(CV_RMSE_folds).T.mean(axis=1)
+summary["CV AUC"] = pd.DataFrame(CV_AUC_folds).T.mean(axis=1)
+```
+
+```{python}
+sum(x != 0 for x in model_fits.loc["LASSO"].values[0].coef_[0].tolist())
+```
+
+```{python}
+len(
+    [i for i in model_fits.loc["LASSO"].values[0].coef_[0] if i != 0]
+)
+```
+
+```{python}
+summary.round(3)
+```
+
+### Take best model and estimate RMSE on holdout  
+
+M4, M5 and LASSO are practically the same - go with the simplest model, M4
+
+```{python}
+best_logit = logit_models["M4"]
+model_equation = "default~" + "+".join(M4)
+_, X_holdout = patsy.dmatrices(model_equation, data_holdout)
+```
+
+Best logit holdout RMSE
+
+```{python}
+data_holdout["best_logit_pred_proba"] = best_logit.predict_proba(X_holdout)[:, 1]
+
+round(rmse(data_holdout["best_logit_pred_proba"], data_holdout["default"]), 3)
+```
+
+### a) Calibration curve
+
+how well do estimated vs actual event probabilities relate to each other?
+
+```{python}
+da.create_calibration_plot(
+    data_holdout,
+    prob_var="best_logit_pred_proba",
+    actual_var="default",
+    y_lab="Actual event probability",
+    n_bins=10,
+    breaks=None,
+)
+```
+
+### b) Confusion table with different tresholds
+
+Default: the threshold 0.5 is used to convert probabilities to binary classes
+
+```{python}
+logit_class_prediction = best_logit.predict(X_holdout)
+
+values, counts = np.unique(logit_class_prediction.tolist(), return_counts=True)
+print(values[0], " (no default): ", counts[0])
+print(values[1], " (default): ", counts[1])
+```
+
+Confusion matrix: summarize different type of errors and successfully predicted cases
+
+positive = "yes": explicitly specify the positive case
+
+```{python}
+cm_object1 = confusion_matrix(
+    data_holdout["default"], logit_class_prediction, labels=[0, 1]
+)
+cm1 = pd.DataFrame(
+    cm_object1,
+    index=["Actul no defaul", "Actual default"],
+    columns=["Predicted no default", "Predicted default"],
+)
+cm1
+```
+
+```{python}
+# we can apply different thresholds
+
+# 0.5 same as before
+holdout_prediction = np.where(data_holdout["best_logit_pred_proba"] < 0.5, 0, 1)
+cm_object1b = confusion_matrix(
+    data_holdout["default"], holdout_prediction, labels=[0, 1]
+)
+cm1b = pd.DataFrame(
+    cm_object1b,
+    index=["Actul no defaul", "Actual default"],
+    columns=["Predicted no default", "Predicted default"],
+)
+cm1b
+```
+
+A sensible choice: mean of predicted probabilities
+
+```{python}
+mean_predicted_default_prob = np.mean(data_holdout["best_logit_pred_proba"])
+round(mean_predicted_default_prob, 3)
+```
+
+```{python}
+holdout_prediction = np.where(
+    data_holdout["best_logit_pred_proba"] < mean_predicted_default_prob, 0, 1
+)
+cm_object2 = confusion_matrix(
+    data_holdout["default"], holdout_prediction, labels=[0, 1]
+)
+cm2 = pd.DataFrame(
+    cm_object2,
+    index=["Actul no defaul", "Actual default"],
+    columns=["Predicted no default", "Predicted default"],
+)
+cm2
+```
+
+### c) Visualize ROC (with thresholds in steps) on holdout
+
+What if we want to compare multiple thresholds?
+
+First, discrete ROC (with thresholds in steps) on holdout
+
+```{python}
+thresholds = np.arange(0.05, 0.76, 0.05)
+#thresholds = sorted(np.geomspace(0.95, 0.05, num=17)) # set these treshold values to get even points in the plot
+cm = dict()
+true_positive_rates = []
+false_positive_rates = []
+holdout_prediction = []
+for thr in thresholds:
+    holdout_prediction = np.where(data_holdout["best_logit_pred_proba"] < thr, 0, 1)
+    cm_thr = confusion_matrix(data_holdout["default"], holdout_prediction, labels=[0, 1])
+    cm[thr] = cm_thr
+    tn, fp, fn, tp = cm_thr.ravel()
+    true_positive_rates.append(tp / (tp + fn))
+    false_positive_rates.append(fp / (fp + tn))
+```
+
+```{python}
+tpr_fpr_for_thresholds = pd.DataFrame(
+    {
+        "thresholds": thresholds,
+        "true_positive_rates": true_positive_rates,
+        "false_positive_rates": false_positive_rates,
+    }
+)
+```
+
+```{python}
+scatter = sns.scatterplot(
+    data=tpr_fpr_for_thresholds,
+    x="false_positive_rates",
+    y="true_positive_rates",
+    hue="thresholds",
+    palette="viridis_r",
+    s=100,
+    alpha=0.8,
+)
+
+plt.xlabel("False positive rate (1 - Specificity)")
+plt.ylabel("True positive rate (Sensitivity)")
+plt.xlim(-0.01, 1.01)
+plt.ylim(-0.01, 1.01)
+plt.xticks(np.arange(0, 1.01, 0.1))
+plt.yticks(np.arange(0, 1.01, 0.1))
+plt.legend(title="Threshold", loc="center right")
+sns.despine()
+plt.show()
+```
+
+Continuous ROC on holdout with best model
+
+```{python}
+create_roc_plot(data_holdout["default"], data_holdout["best_logit_pred_proba"])
+```
+
+## 3. We have a loss function
+
+Introduce loss function
+
+Relative cost of of a false negative classification (as compared with a false positive classification)
+
+```{python}
+FP = 1
+FN = 10
+cost = FN / FP
+```
+
+The prevalence, or the proportion of cases in the population (n.cases/(n.controls+n.cases))
+
+```{python}
+prevelance = y_train.sum() / len(y_train)
+```
+
+Draw ROC Curve and find optimal threshold with loss function 
+
+The optimal cut-off is the threshold that maximizes the distance to the identity (diagonal) line
+
+Iterate through:
+ 1. models
+ 2. Folds
+
+```{python}
+best_thresholds_cv = dict()
+expected_loss_cv = dict()
+fold5_threshold = dict()
+fold5_expected_loss = dict()
+fold5_all_coords = dict()
+
+for i, model_name in enumerate(logit_models):
+    best_thresholds = []
+    expected_loss = []
+
+    if model_name != "LASSO":
+        _, X = patsy.dmatrices("default ~" + "+".join(logit_model_vars[i]), data_train)
+        X = pd.DataFrame(X)
+        c_index = 0
+    else:
+        X = normalized_logitvars
+        c_index = best_lambda_i
+    fold = 0
+    for train_index, test_index in k.split(X):
+        X_fold = X.iloc[test_index, :]
+        y_fold = data_train["default"].iloc[test_index]
+        pred_fold = generate_fold_prediction(
+            logit_models[model_name], X_fold, fold, c_index
+        )
+        false_pos_rate, true_pos_rate, thresholds = roc_curve(y_fold, pred_fold)
+        optimal_threshold = sorted(
+            list(
+                zip(
+                    np.abs(
+                        true_pos_rate
+                        + (1 - prevelance) / (cost * prevelance) * (1 - false_pos_rate)
+                    ),
+                    thresholds,
+                )
+            ),
+            key=lambda i: i[0],
+            reverse=True,
+        )[0][1]
+        best_thresholds.append(optimal_threshold)
+        threshold_prediction = np.where(pred_fold < optimal_threshold, 0, 1)
+        tn, fp, fn, tp = confusion_matrix(
+            y_fold, threshold_prediction, labels=[0, 1]
+        ).ravel()
+        curr_exp_loss = (fp * FP + fn * FN) / len(y_fold)
+        expected_loss.append(curr_exp_loss)
+        fold = fold + 1
+
+    best_thresholds_cv[model_name] = np.mean(best_thresholds)
+    expected_loss_cv[model_name] = np.mean(expected_loss)
+
+    # for fold #5
+    fold5_threshold[model_name] = optimal_threshold
+    fold5_expected_loss[model_name] = curr_exp_loss
+
+    all_coords = pd.DataFrame(
+        {
+            "false_pos": false_pos_rate * sum(y_fold == 0),
+            "true_pos": true_pos_rate * sum(y_fold == 1),
+            "false_neg": sum(y_fold == 1) - true_pos_rate * sum(y_fold == 1),
+            "true_neg": sum(y_fold == 0) - false_pos_rate * sum(y_fold == 0),
+            "pos": sum(y_fold == 1),
+            "neg": sum(y_fold == 0),
+            "n": len(y_fold),
+            "thresholds": thresholds,
+        }
+    )
+
+    fold5_all_coords[model_name] = all_coords
+```
+
+```{python}
+summary_with_lossfnc = pd.DataFrame(
+    best_thresholds_cv.items(), columns=["Model", "Avg of optimal thresholds"]
+)
+summary_with_lossfnc["Threshold for Fold5"] = fold5_threshold.values()
+summary_with_lossfnc["Avg expected loss"] = expected_loss_cv.values()
+summary_with_lossfnc["Expected loss for Fold5"] = fold5_expected_loss.values()
+```
+
+```{python}
+summary_with_lossfnc
+```
+
+Create loss plot based on Fold5 in CV 
+
+```{python}
+model_to_plot = "M4"  # select model to plot
+create_loss_plot(
+    fold5_all_coords[model_to_plot],
+    fold5_threshold[model_to_plot],
+    fold5_expected_loss[model_to_plot],
+)
+```
+
+Create roc plot plot based on Fold5 in CV
+
+```{python}
+create_roc_plot_with_optimal(
+    fold5_all_coords[model_to_plot], fold5_threshold[model_to_plot]
+)
+```
+
+Let's see our chosen model, M4's holdout expected loss
+
+```{python}
+best_logit_optimal_treshold = best_thresholds_cv["M4"]
+
+# Get expected loss on holdout
+holdout_treshold = np.where(
+    data_holdout["best_logit_pred_proba"] < best_logit_optimal_treshold, 0, 1
+)
+tn, fp, fn, tp = confusion_matrix(
+    data_holdout["default"], holdout_treshold, labels=[0, 1]
+).ravel()
+expected_loss_holdout = (fp * FP + fn * FN) / len(data_holdout["default"])
+round(expected_loss_holdout, 3)
+```
+
+CM on holdout
+
+```{python}
+cm_object3 = confusion_matrix(data_holdout["default"], holdout_treshold, labels=[0, 1])
+cm3 = pd.DataFrame(
+    cm_object3,
+    index=["Actul no defaul", "Actual default"],
+    columns=["Predicted no default", "Predicted default"],
+)
+cm3
+```
+
+# PREDICTION WITH RANDOM FOREST
+
+```{python}
+y_train, rfvars_train = patsy.dmatrices("default~" + "+".join(rfvars), data_train)
+y_holdout, rfvars_holdout = patsy.dmatrices("default~" + "+".join(rfvars), data_holdout)
+```
+
+## Graph example for decision tree
+
+```{python}
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import plot_tree
+
+data_for_graph = data_train[["sales_mil", "profit_loss_year", "foreign_management"]]
+rf_for_graph = DecisionTreeClassifier(
+    ccp_alpha=0.0028, min_samples_leaf=100, max_depth=3, random_state=41
+).fit(data_for_graph, y_train)
+
+plt.figure()
+plt.figure(figsize=(11, 11))
+plot_tree(
+    rf_for_graph,
+    feature_names=data_for_graph.columns,
+    filled=True,
+    rounded=True,
+    proportion=True,
+    fontsize=10,
+)
+plt.title("Decision tree")
+plt.show()
+```
+
+## Probability forest
+
+Split by gini, ratio of 1's in each tree, average over trees
+
+```{python}
+grid = {
+    "max_features": [5, 6, 7],
+    "criterion": ["gini"],
+    "min_samples_split": [11, 16],
+} 
+```
+
+5 fold cross validation
+
+```{python}
+prob_forest = RandomForestClassifier(random_state=42, n_estimators=500, oob_score=True)
+prob_forest_grid = GridSearchCV(
+    prob_forest,
+    grid,
+    cv=k,
+    refit="roc_auc",
+    scoring=["roc_auc", "neg_brier_score"],
+)
+```
+
+```{python}
+prob_forest_fit = prob_forest_grid.fit(rfvars_train, y_train)
+```
+
+Create CV summary table
+
+```{python}
+prob_forest_cv_results = pd.DataFrame(
+    {
+        "max_features": prob_forest_fit.cv_results_["param_max_features"],
+        "min_samples_split": prob_forest_fit.cv_results_["param_min_samples_split"],
+        "cv_auc": prob_forest_fit.cv_results_["mean_test_roc_auc"],
+        "cv_rmse": np.sqrt(
+            prob_forest_fit.cv_results_["mean_test_neg_brier_score"] * -1
+        ),
+    }
+)
+
+prob_forest_cv_results
+```
+
+Obtain optimal parameter values
+
+```{python}
+best_mtry = prob_forest_fit.best_params_["max_features"]
+best_min_node_size = prob_forest_fit.best_params_["min_samples_split"]
+prob_forest_fit.best_params_
+```
+
+Get average (ie over the folds) RMSE and AUC
+
+```{python}
+prob_forest_best_results = prob_forest_cv_results[
+    (prob_forest_cv_results.max_features == best_mtry)
+    & (prob_forest_cv_results.min_samples_split == best_min_node_size)
+]
+prob_forest_best_results_index = prob_forest_best_results.index.values[0]
+```
+
+```{python}
+summary.loc["RF", "Number of Coefficients"] = "n.a."
+summary.loc["RF", "CV RMSE"] = prob_forest_best_results["cv_rmse"].values[0]
+summary.loc["RF", "CV AUC"] = prob_forest_best_results["cv_auc"].values[0]
+summary
+```
+
+Extract fold level RMSE and AUC
+
+```{python}
+CV_RMSE_folds["RF"] = np.sqrt(
+    pd.DataFrame(prob_forest_fit.cv_results_)
+    .filter(like="_test_neg_brier_score")
+    .loc[lambda x: x["rank_test_neg_brier_score"] == 1]
+    .filter(like="split")
+    .values[0]
+    * -1
+)
+CV_AUC_folds["RF"] = (
+    pd.DataFrame(prob_forest_fit.cv_results_)
+    .filter(like="_test_roc_auc")
+    .loc[lambda x: x["rank_test_roc_auc"] == 1]
+    .filter(like="split")
+    .values[0]
+)
+```
+
+Take a look at foldwise RMSE and AUC
+
+```{python}
+pd.DataFrame(CV_RMSE_folds)
+```
+
+```{python}
+pd.DataFrame(CV_AUC_folds)
+```
+
+Now use loss function and search for best thresholds and expected loss over folds 
+
+```{python}
+best_thresholds = list()
+expected_loss = list()
+rfvars_train = pd.DataFrame(rfvars_train)
+
+fold = 0
+for train_index, test_index in k.split(rfvars_train):
+    X_fold = rfvars_train.iloc[test_index, :]
+    y_fold = data_train["default"].iloc[test_index]
+
+    X_fold_train = rfvars_train.iloc[train_index, :]
+    y_fold_train = data_train["default"].iloc[train_index]
+
+    prob_forest_best = RandomForestClassifier(
+        random_state=42,
+        n_estimators=500,
+        oob_score=True,
+        criterion="gini",
+        max_features=best_mtry,
+        min_samples_split=best_min_node_size,
+    )
+    prob_forest_best_fold = prob_forest_best.fit(X_fold_train, y_fold_train)
+    pred_fold = prob_forest_best_fold.predict_proba(X_fold)[:, 1]
+
+    false_pos_rate, true_pos_rate, threshold = roc_curve(y_fold, pred_fold)
+    best_threshold = sorted(
+        list(
+            zip(
+                np.abs(
+                    true_pos_rate
+                    + (1 - prevelance) / (cost * prevelance) * (1 - false_pos_rate)
+                ),
+                threshold,
+            )
+        ),
+        key=lambda x: x[0],
+        reverse=True,
+    )[0][1]
+    best_thresholds.append(best_threshold)
+    threshold_prediction = np.where(pred_fold < best_threshold, 0, 1)
+    tn, fp, fn, tp = confusion_matrix(
+        y_fold, threshold_prediction, labels=[0, 1]
+    ).ravel()
+    curr_exp_loss = (fp * FP + fn * FN) / len(y_fold)
+    expected_loss.append(curr_exp_loss)
+
+fold5_threshold_rf = best_threshold
+fold5_expected_loss_rf = curr_exp_loss
+
+all_coords_rf = pd.DataFrame(
+    {
+        "false_pos": false_pos_rate * sum(y_fold == 0),
+        "true_pos": true_pos_rate * sum(y_fold == 1),
+        "false_neg": sum(y_fold == 1) - true_pos_rate * sum(y_fold == 1),
+        "true_neg": sum(y_fold == 0) - false_pos_rate * sum(y_fold == 0),
+        "pos": sum(y_fold == 1),
+        "neg": sum(y_fold == 0),
+        "n": len(y_fold),
+        "thresholds": threshold,
+    }
+)
+```
+
+```{python}
+expected_loss_cv["RF"] = np.mean(expected_loss)
+best_thresholds_cv["RF"] = np.mean(best_thresholds)
+```
+
+```{python}
+rf_summary = pd.DataFrame(
+    {
+        "CV RMSE": [round(prob_forest_best_results["cv_rmse"].values[0], 3)],
+        "CV AUC": [round(prob_forest_best_results["cv_auc"].values[0], 3)],
+        "Avg of optimal thresholds": [round(best_thresholds_cv["RF"], 3)],
+        "Threshold for Fold5": [round(best_threshold, 3)],
+        "Avg expected loss": [round(expected_loss_cv["RF"], 3)],
+        "Expected loss for Fold5": [round(curr_exp_loss, 3)],
+    }
+)
+
+rf_summary
+```
+
+Create plots based on Fold5 in CV 
+
+```{python}
+create_loss_plot(all_coords_rf, fold5_threshold_rf, fold5_expected_loss_rf)
+```
+
+```{python}
+create_roc_plot_with_optimal(all_coords_rf, fold5_threshold_rf)
+```
+
+Take model to holdout and estimate RMSE, AUC and expected loss 
+
+```{python}
+prob_forest_fit_best = prob_forest_fit.best_estimator_
+rf_predicted_probabilities_holdout = prob_forest_fit_best.predict_proba(rfvars_holdout)[
+    :, 1
+]
+rmse_rf = np.sqrt(mean_squared_error(y_holdout, rf_predicted_probabilities_holdout))
+round(rmse_rf, 3)
+```
+
+ROC AUC  on holdout
+
+```{python}
+auc_rf = roc_auc_score(y_holdout, rf_predicted_probabilities_holdout)
+round(auc_rf, 3)
+```
+
+ Get expected loss on holdout
+
+```{python}
+holdout_treshold = np.where(
+    rf_predicted_probabilities_holdout < best_thresholds_cv["RF"], 0, 1
+)
+tn, fp, fn, tp = confusion_matrix(y_holdout, holdout_treshold, labels=[0, 1]).ravel()
+expected_loss_holdout = (fp * FP + fn * FN) / len(y_holdout)
+round(expected_loss_holdout, 3)
+```
+
+## Final results
+
+```{python}
+summary["CV treshold"] = best_thresholds_cv
+summary["CV expected Loss"] = expected_loss_cv
+```
+
+```{python}
+summary
+```
+
+

@@ -1,0 +1,459 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 13
+**CH11 Used cars**
+
+using the used-cars dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/used-cars/clean/"
+data_out = dirname + "da_case_studies/ch13-used-cars-reg/"
+output = dirname + "da_case_studies/ch13-used-cars-reg/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# DATA IMPORT
+data = pd.read_csv(data_in + "used-cars_2cities_prep.csv")
+#data = pd.read_csv("https://osf.io/7gvz9/download")
+
+```
+
+```{python}
+# SAMPLE DESIGN
+
+# Manage missing
+data["fuel"] = data["fuel"].fillna("Missing")
+data["condition"] = data["condition"].fillna("Missing")
+data["drive"] = data["drive"].fillna("Missing")
+data["cylinders"] = data["cylinders"].fillna("Missing")
+data["transmission"] = data["transmission"].fillna("Missing")
+data["type"] = data["type"].fillna("Missing")
+```
+
+```{python}
+# drop hybrid models then drop column
+data = data.loc[data.Hybrid == 0].drop(["Hybrid"], axis=1)
+```
+
+```{python}
+# check frequency by fuel type
+freq = data.groupby("fuel").agg(frequency=("type", "size"))
+freq["percent"] = round(freq["frequency"] / sum(freq["frequency"]) * 100, 3)
+freq["cumulative_percent"] = np.cumsum(freq["percent"])
+freq
+```
+
+```{python}
+# keep gas-fuelled vehicles
+data = data.loc[data.fuel == "gas"]
+```
+
+```{python}
+# check frequency by vehicle condition
+freq = data.groupby("condition").agg(frequency=("type", "size"))
+freq["percent"] = round(freq["frequency"] / sum(freq["frequency"]) * 100, 3)
+freq["cumulative_percent"] = np.cumsum(freq["percent"])
+freq
+```
+
+```{python}
+# drop vehicles in fair and new condition, trucks
+data = data.loc[~data.condition.isin(["new", "fair"])]
+
+# drop unrealistic values for price and odometer reading
+data = data.loc[(data.price >= 500) & (data.price <= 25000) & (data.odometer <= 100)]
+
+# drop if price is smaller than 1000 and condition is like new or age is less than 8
+data = data.loc[
+    ~((data.price < 1000) & ((data.condition == "like new") | (data.age < 8)))
+]
+```
+
+```{python}
+# check frequency by transmission
+freq = data.groupby("transmission").agg(frequency=("type", "size"))
+freq["percent"] = round(freq["frequency"] / sum(freq["frequency"]) * 100, 3)
+freq["cumulative_percent"] = np.cumsum(freq["percent"])
+freq
+```
+
+```{python}
+data = data.loc[~(data.transmission == "manual")]
+```
+
+```{python}
+# check frequency by transmission
+freq = data.groupby("type").agg(frequency=("type", "size"))
+freq["percent"] = round(freq["frequency"] / sum(freq["frequency"]) * 100, 3)
+freq["cumulative_percent"] = np.cumsum(freq["percent"])
+freq
+```
+
+```{python}
+# drop if truck
+data = data.loc[~(data.type == "truck")]
+# drop pricestr
+data = data.drop(["pricestr"], axis=1)
+```
+
+```{python}
+# DATA GENERATION & DESCRIPTIVES
+# CONDITION
+data["cond_excellent"] = np.where(data["condition"] == "excellent", 1, 0)
+data["cond_good"] = np.where(data["condition"] == "good", 1, 0)
+data["cond_likenew"] = np.where(data["condition"] == "like new", 1, 0)
+# cylinders
+data["cylind6"] = np.where(data["cylinders"] == "6 cylinders", 1, 0)
+data.cylinders.value_counts()
+data.cylind6.value_counts()
+# age: quadratic, cubic
+data["agesq"] = data["age"] ** 2
+data["agecu"] = data["age"] ** 3
+# odometer quadratic
+data["odometersq"] = data["odometer"] ** 2
+```
+
+```{python}
+# Frequency tables
+
+# area
+data.groupby("area").agg(frequency=("price", "size"), mean=("price", np.mean))
+```
+
+```{python}
+# focus only on Chicago
+data = data.loc[data.area == "chicago"]
+```
+
+```{python}
+# condition
+data.groupby("condition").agg(frequency=("price", "size"), mean=("price", np.mean))
+```
+
+```{python}
+# drive
+data.groupby("drive").agg(frequency=("price", "size"), mean=("price", np.mean))
+```
+
+```{python}
+# dealer
+data.groupby("dealer").agg(frequency=("price", "size"), mean=("price", np.mean))
+```
+
+```{python}
+# data summary
+data.loc[
+    :,
+    [
+        "age",
+        "odometer",
+        "LE",
+        "XLE",
+        "SE",
+        "cond_likenew",
+        "cond_excellent",
+        "cond_good",
+        "cylind6",
+    ],
+].describe()
+```
+
+```{python}
+# Histograms not in the textbook
+```
+
+```{python}
+fig = sns.histplot(
+    data,
+    x="price",
+    stat="percent",
+    binwidth=1000,
+    binrange=(1, 20000),
+    alpha=1,
+)
+plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100, decimals=0))
+plt.yticks(da.seq(0, 15, 5))
+plt.xlim(0, 20000)
+plt.xlabel("Price (US dollars)")
+da.add_margin(fig, x=0.01, y=0.01)
+plt.show()
+```
+
+```{python}
+fig = sns.histplot(
+    data,
+    x="lnprice",
+    stat="percent",
+    binwidth=0.2,
+    binrange=(6, 10),
+    alpha=1,
+)
+
+plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100, decimals=0))
+plt.xticks(da.seq(6, 10, 1))
+plt.xlim(6, 10)
+plt.xlabel("ln(Price, US dollars")
+da.add_margin(fig, x=0.01, y=0.01)
+plt.show()
+```
+
+### Regression analysis
+
+```{python}
+fig = sns.scatterplot(data=data, x="age", y="price", alpha=0.8)
+da.plot_loess(data, "age", "price", span=0.8)
+plt.xlabel("Age (years)")
+plt.ylabel("Price (US dollars)")
+plt.xticks(da.seq(0, 30, 5))
+plt.yticks(da.seq(0, 20000, 5000))
+da.add_margin(fig, x=0.01, y=0.01)
+plt.show()
+```
+
+```{python}
+data.describe()
+```
+
+```{python}
+###################################
+# Linear regressions
+
+# Model 1: Linear regression on age
+model1 = "price ~ age + agesq"
+
+# Models 2-5: Multiple linear regressions
+# note: condition - missing will be baseline for regs
+model2 = "price ~ age + agesq + odometer"
+model3 = "price ~ age + agesq + odometer + odometersq + LE + cond_excellent + cond_good + dealer"
+model4 = "price ~ age + agesq + odometer + odometersq + LE + XLE + SE + cond_likenew + cond_excellent + cond_good + cylind6 + dealer"
+model5 = "price ~ age + agesq + odometer + odometersq + LE * age + XLE * age + SE * age + cond_likenew * age + cond_excellent * age + cond_good * age + cylind6 * age + odometer * age + dealer * age"
+
+model_equations = [model1, model2, model3, model4, model5]
+```
+
+Estimate regressions
+
+```{python}
+regs = []
+for equation in model_equations:
+    regs.append(pf.feols(equation, data, vcov="HC1"))
+```
+
+```{python}
+fig = sns.scatterplot(data=data, x="age", y="price", alpha=0.8)
+da.plot_loess(data, "age", "price", span=0.8)
+data["reg0preds"] = regs[0].predict()
+sns.lineplot(data, x="age", y="reg0preds")
+
+plt.xlabel("Age (years)")
+plt.ylabel("Price (US dollars)")
+plt.xticks(da.seq(0, 30, 5))
+plt.yticks(da.seq(0, 20000, 5000))
+da.add_margin(fig, x=0.01, y=0.01)
+plt.show()
+```
+
+### Table 13.2 Regression models for predicting used car price
+
+```{python}
+pf.etable(regs[:4])
+```
+
+Model 5 - not displayed in book
+
+```{python}
+regs[4].summary()
+```
+
+## Cross validation
+
+Use custom function `ols_crossvalidator` for cross validation
+
+```{python}
+# help(ols_crossvalidator)
+```
+
+Set n_fold = 4 for 4-fold cross-validation
+
+```{python}
+n_fold = 4
+```
+
+Cross-validate models
+
+```{python}
+cv_list = []
+for equation in model_equations:
+    cv_list.append(da.ols_crossvalidator(equation, data, n_fold, average_rmse=False))
+```
+
+### Table 13.4 Car price models estimated using all original data and measures of fit using all original data
+
+```{python}
+(
+    pd.DataFrame(cv_list)
+    .round(2)
+    .assign(
+        RMSE=lambda x: x["RMSE"].astype(int),
+        BIC=lambda x: x["BIC"].astype(int),
+        Coefficients=lambda x: x["Coefficients"].astype(int),
+        Model=["Model " + str(i + 1) for i in range(len(model_equations))],
+        Nvars=[1, 2, 5, 6, 6],
+    )
+    .filter(["Model", "Nvars", "Coefficients", "R-squared", "RMSE", "BIC"])
+    .set_index("Model")
+)
+```
+
+### Table 13.5 Car price models estimated and evaluated using 4-fold cross-validation and RMSE
+
+```{python}
+pd.DataFrame(
+    [cv["Test RMSE"] for cv in cv_list],
+    index=["Model " + str(i + 1) for i in range(len(cv_list))],
+    columns=["Fold" + str(i + 1) for i in range(len(cv_list[0]["Test RMSE"]))],
+).assign(Average=lambda x: x.mean(axis=1)).T.round().astype(int)
+```
+
+### Prediction
+
+```{python}
+data = data.loc[
+    :,
+    [
+        "age",
+        "agesq",
+        "odometer",
+        "odometersq",
+        "SE",
+        "LE",
+        "XLE",
+        "cond_likenew",
+        "cond_excellent",
+        "cond_good",
+        "dealer",
+        "price",
+        "cylind6",
+    ],
+]
+```
+
+```{python}
+data.dtypes
+```
+
+```{python}
+new = pd.DataFrame(
+    pd.Series(
+        {
+            "age": 10,
+            "agesq": 10**2,
+            "odometer": 12,
+            "odometersq": 12**2,
+            "SE": 0,
+            "LE": 1,
+            "XLE": 0,
+            "cond_likenew": 0,
+            "cond_excellent": 1,
+            "cond_good": 0,
+            "dealer": 0,
+            "price": np.nan,
+            "cylind6": 0,
+        }
+    )
+).T
+new
+```
+
+```{python}
+reg1 = regs[0]
+reg3 = regs[2]
+```
+
+```{python}
+pd.Series(reg1.resid()).describe()
+```
+
+```{python}
+(reg3.predict(data) - data["price"]).describe()
+```
+
+### Table 13.3 Point predictions and interval predictions for a specific car, using models 1 and 3
+
+```{python}
+table = (
+    pd.concat(
+        [reg.predict(new, interval="prediction", alpha=0.05) for reg in [reg1, reg3]],
+    )
+    .set_axis(["Model 1", "Model 3"], axis=0)
+    .astype(int)
+)
+
+table["Point prediction"] = table["fit"]
+table["Prediction Interval (95%)"] = (
+    "[" + table["ci_low"].astype(str) + "-" + table["ci_high"].astype(str) + "]"
+)
+p80 = (
+    pd.concat(
+        [reg.predict(new, interval="prediction", alpha=0.2) for reg in [reg1, reg3]]
+    )
+    .set_axis(["Model 1", "Model 3"], axis=0)
+    .astype(int)
+)
+table["Prediction Interval (80%)"] = (
+    "[" + p80["ci_low"].astype(str) + "-" + p80["ci_high"].astype(str) + "]"
+)
+```
+
+```{python}
+table.T.iloc[-3:, :]
+```
+
+

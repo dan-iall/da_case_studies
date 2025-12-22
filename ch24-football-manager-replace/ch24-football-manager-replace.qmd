@@ -1,0 +1,638 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+
+### Chapter 24
+**CH24B Estimating the impact of replacing football team managers**
+
+using the football dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+from datetime import datetime as dt
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/football/clean/"
+data_out = dirname + "da_case_studies/ch24-football-manager-replace/"
+output = dirname + "da_case_studies/ch24-football-manager-replace/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+## Loading and preparing data
+
+```{python}
+data = pd.read_csv(data_in + "football_managers_workfile.csv")
+# data = pd.read_csv("https://osf.io/t6dgh/download")
+```
+
+```{python}
+data["date"] = data["date"].apply(lambda x: dt.strptime(x.strip()[0:10], "%Y-%m-%d"))
+```
+
+```{python}
+# describe data
+data[["season", "team", "gameno", "points"]].describe()
+```
+
+```{python}
+data["shifted"] = (
+    data.sort_values(by=["team", "season", "date"])
+    .groupby(["team", "season"])["manager_id"]
+    .shift()
+)  # helper column
+```
+
+```{python}
+data[["team", "season", "date", "manager_id", "shifted"]].head(10)
+```
+
+```{python}
+# Step 1: Sort and compute previous manager
+data = data.sort_values(by=["team", "season", "date"]).reset_index(drop=True)
+data["prev_manager"] = data.groupby(["team", "season"])["manager_id"].shift()
+
+
+# Step 2: Identify if a manager change happened
+def detect_change(row):
+    if pd.isnull(row["prev_manager"]):
+        return np.nan  # First entry, no previous manager
+    if row["manager_id"] == row["prev_manager"]:
+        return 0
+    else:
+        return 1
+
+
+data["managchange"] = data.apply(detect_change, axis=1)
+
+# Step 3: Count manager changes
+data["countmanagchange"] = data.groupby(["team", "season"])["managchange"].transform(
+    sum
+)
+```
+
+```{python}
+data["managchange"].value_counts(dropna=False)
+```
+
+```{python}
+data[["countmanagchange", "team", "season"]].groupby("countmanagchange").apply(
+    lambda x: x.groupby(["team", "season"]).ngroups
+)
+```
+
+##   BALANCED PANEL
+
+We define intervention as ***management change***:
+ - at least 12 games before (since season started or previous management changed)
+ - at least 12 games after (till season ends or next management change)
+
+```{python}
+data["max_gameno"] = data.groupby(["team", "season"])["gameno"].transform("max")
+```
+
+```{python}
+data_aux = data.loc[lambda x: x["managchange"] == 1].reset_index(drop=True)
+```
+
+```{python}
+data_aux["gamesbefore"] = (
+    data_aux.groupby(["team", "season"])["gameno"].diff().fillna(data_aux["gameno"] - 1)
+)
+```
+
+```{python}
+data_aux["gamesafter"] = (
+    data_aux.groupby(["team", "season"])["gameno"]
+    .diff(-1)
+    .fillna(data_aux["max_gameno"] - data_aux["gameno"])
+    .abs()
+)
+```
+
+```{python}
+data_aux["intervention"] = np.where(
+    (data_aux["gamesbefore"] < 12) | (data_aux["gamesafter"] < 12),
+    0,
+    data_aux["managchange"],
+)
+```
+
+```{python}
+data_aux = data_aux[["team", "season", "date", "intervention"]]
+```
+
+```{python}
+data_aux["intervention"].describe()
+```
+
+```{python}
+data_balanced = data.merge(data_aux, on=["team", "season", "date"], how="left")
+data_balanced["intervention"] = data_balanced["intervention"].fillna(0)
+```
+
+```{python}
+data_balanced["countinterv"] = data_balanced.groupby(["team", "season"])["intervention"].transform("sum")
+```
+
+```{python}
+data_balanced["intervention"].describe()
+```
+
+```{python}
+data_balanced["countinterv"].describe()
+```
+
+```{python}
+data_balanced = data_balanced.merge(
+    data_balanced.loc[lambda x: x["intervention"] == 1]
+    .groupby(["team", "season"])["gameno"]
+    .min()
+    .reset_index(name="intervention_time"),
+    on=["team", "season"],
+    how="left",
+)
+```
+
+```{python}
+data_balanced["t_event"] = np.where(
+    np.isfinite(data_balanced["intervention_time"]),
+    data_balanced["gameno"] - data_balanced["intervention_time"],
+    np.nan,
+)
+```
+
+```{python}
+data_balanced["t_event"] = data_balanced.groupby(["team", "season", "date"])[
+    "t_event"
+].transform(lambda x: np.where((x >= 0) & (x <= 38), x + 1, x))
+```
+
+```{python}
+data_balanced = data_balanced.loc[
+    lambda x: ((x["countinterv"] == 1) & (x["t_event"] >= -12) & (x["t_event"] <= 12))
+    | (x["countmanagchange"] == 0)
+]
+```
+
+```{python}
+data_balanced.groupby("countinterv").apply(
+    lambda x: x.groupby(["team", "season"]).ngroups
+)
+```
+
+```{python}
+# figure: average number interventions by game number
+fig, ax = plt.subplots(figsize=(7, 5.5))
+
+fig = sns.barplot(
+    data=data_balanced,
+    x="gameno",
+    y="intervention",
+    estimator="sum",
+    ci=None,
+    width=1,
+    alpha=0.8,
+    ax=ax,
+)
+
+plt.ylabel("Number of manager changes")
+plt.xlabel("Game number")
+plt.ylim(0, 6)
+plt.xticks(np.arange(-1, 36, 4), labels=np.arange(0, 37, 4))
+plt.grid(axis="x", linestyle="-", color="lightgray")
+plt.show()
+```
+
+```{python}
+data_plot = (
+    data_balanced.groupby("t_event")
+    .agg(mean=("points", "mean"))
+    .reset_index()
+    .assign(
+        t_event_6=lambda df: pd.cut(
+            df["t_event"], bins=[-13, -6, 0, 1, 7, 13], right=False
+        )
+    )
+)
+data_plot = data_plot.merge(
+    data_plot.groupby("t_event_6").agg(group_mean=("mean", "mean")),
+    on="t_event_6",
+    how="left",
+)
+
+fig, ax = plt.subplots(figsize=(7, 5.5))
+
+sns.scatterplot(data=data_plot, x="t_event", y="mean", ax=ax)
+
+# Line plot for group means
+for _, group_data in data_plot.groupby("t_event_6"):
+    ax.plot(
+        group_data["t_event"],
+        group_data["group_mean"],
+        linewidth=2.5,
+        color=da.color[0],
+    )
+
+# Vertical line at x = 0
+ax.axvline(x=0, color=da.color[2], linestyle="--", linewidth=3)
+
+# Labels and axis customization
+ax.set_xlabel("Event time: games before/after manager change")
+ax.set_ylabel("Average points")
+ax.set_xticks([-12, -6, -1, 1, 6, 12])
+ax.set_xlim(-12, 12)
+ax.set_yticks(np.arange(0, 1.8, 0.2))
+ax.set_ylim(0, 1.7)
+
+# Annotations
+ax.text(4, 0.1, "after", fontsize=10, ha="center")
+ax.text(-6, 0.1, "before", fontsize=10, ha="center")
+da.add_margin(ax, x=0.05, y=0.02)
+```
+
+## CREATE CONTORL GROUP WITH PSEUDO-INTERVENTIONS
+
+```{python}
+# for each game, define avg diff of points 12-7 before
+# dip: avg diff of points 6-1 before minus 12-7 before
+
+
+data_balanced["points_b_7_12"] = (
+    data_balanced.sort_values(by=["team", "season", "date"])
+    .groupby(["team", "season"])["points"]
+    .transform(
+        lambda x: x.shift(12)
+        + x.shift(11)
+        + x.shift(10)
+        + x.shift(9)
+        + x.shift(8)
+        + x.shift(7),
+    )
+)
+
+data_balanced["points_b_1_6"] = (
+    data_balanced.sort_values(by=["team", "season", "date"])
+    .groupby(["team", "season"])["points"]
+    .transform(
+        lambda x: x.shift(6)
+        + x.shift(5)
+        + x.shift(4)
+        + x.shift(3)
+        + x.shift(2)
+        + x.shift(1),
+    )
+)
+
+data_balanced = data_balanced.assign(
+    dip=lambda df: df["points_b_1_6"] / 6 - df["points_b_7_12"] / 6
+).assign(points_b_1=lambda df: df["points"].shift(1))
+```
+
+```{python}
+# summary stats of dip when intervention
+data_balanced.loc[lambda x: x["intervention"] == 1][
+    ["points_b_1_6", "points_b_7_12", "dip", "points_b_1"]
+].describe()
+```
+
+```{python}
+# set ranges to define control group
+points_b_7_12min = 5
+points_b_7_12max = 8
+dipmin = -1.33
+dipmax = -0.166
+points_b_1min = 0
+points_b_1max = 0
+```
+
+```{python}
+data_balanced["pseudo"] = np.where(
+    (data_balanced["countmanagchange"] == 0)
+    & (data_balanced["dip"] >= dipmin)
+    & (data_balanced["dip"] <= dipmax)
+    & (data_balanced["points_b_7_12"] >= points_b_7_12min)
+    & (data_balanced["points_b_7_12"] <= points_b_7_12max)
+    & (data_balanced["points_b_1"] >= points_b_1min)
+    & (data_balanced["points_b_1"] <= points_b_1max)
+    & (data_balanced["gameno"] < (38 - 12)),
+    1,
+    0,
+)
+```
+
+```{python}
+data_balanced["pseudo"].value_counts(dropna=False)
+```
+
+```{python}
+data_balanced.loc[lambda x: x["pseudo"] == 1].filter(
+    ["points_b_7_12", "dip", "points_b_1"]
+).describe()
+```
+
+ if more such games in a teamXseason, choose one randomly
+
+```{python}
+rng = np.random.default_rng(27845)
+data_balanced = pd.concat(
+    [
+        data_balanced.loc[~(data_balanced["pseudo"] == 1)],
+        data_balanced.sort_values(by=["team", "season"])
+        .loc[lambda x: x["pseudo"] == 1]
+        .groupby(["team", "season"])
+        .agg(rng.choice)
+        .reset_index(),
+    ]
+).reset_index(drop=True)
+```
+
+**Note**: In the textbook (2021 edition) we say  "When there was more than one candidate game 
+within the same season for the same team, we selected the first one in the season."
+
+
+In fact we mean "..., we selected **one in the season randomly**."
+
+```{python}
+data_balanced["pseudo"].value_counts(dropna=False)
+```
+
+```{python}
+data_balanced.loc[lambda x: x["pseudo"] == 1][["points_b_7_12", "dip", "points_b_1"]].describe()
+```
+
+```{python}
+data_balanced["countpseudo"] = data_balanced.groupby(["team", "season"])[
+    "pseudo"
+].transform("sum")
+```
+
+```{python}
+data_balanced = data_balanced.merge(
+    data_balanced.loc[data_balanced["pseudo"] == 1]
+    .groupby(["team", "season"])["gameno"]
+    .min()
+    .reset_index(name="pseudo_time"),
+    on=["team", "season"],
+    how="left",
+)
+```
+
+```{python}
+data_balanced["t_pseudo"] = np.where(
+    np.isfinite(data_balanced["pseudo_time"]),
+    data_balanced["gameno"] - data_balanced["pseudo_time"],
+    np.nan,
+)
+```
+
+```{python}
+data_balanced["t_pseudo"] = data_balanced.groupby(["team", "season", "date"])[
+    "t_pseudo"
+].transform(lambda x: np.where((x >= 0) & (x <= 38), x + 1, x))
+```
+
+```{python}
+data_balanced["t_event"] = np.where(
+    np.isnan(data_balanced["t_event"]),
+    data_balanced["t_pseudo"],
+    data_balanced["t_event"],
+)
+```
+
+```{python}
+data_balanced = data_balanced.loc[
+    lambda x: (x["t_event"] >= -12) & (x["t_event"] <= 12)
+]
+```
+
+```{python}
+data_balanced.groupby(["countinterv", "countpseudo"]).apply(
+    lambda x: x.groupby(["team", "season"]).ngroups
+)
+```
+
+## FIGURE with intervention and pseudo-intervention averages
+
+```{python}
+data_plot = (
+    data_balanced.groupby(["t_event", "countinterv", "countpseudo"])
+    .agg(mean_points=("points", "mean"))
+    .reset_index()
+)
+data_plot["t_event_6"] = pd.cut(
+    data_plot["t_event"], bins=[-13, -6, 0, 1, 7, 13], right=False
+)
+data_plot["group_mean"] = data_plot.groupby(["t_event_6", "countpseudo"])[
+    "mean_points"
+].transform("mean")
+data_plot["countpseudo"] = (
+    data_plot["countpseudo"]
+    .map({0: "intervention", 1: "pseudo-intervention"})
+    .astype("category")
+)
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(7, 5.5))
+
+# Scatter plot for each group
+sns.scatterplot(data=data_plot, x="t_event", y="mean_points", hue="countpseudo", ax=ax)
+
+# Line plot for group means
+for pseudo_value in sorted(data_plot["countpseudo"].unique()):
+    group_data = data_plot[data_plot["countpseudo"] == pseudo_value]
+    for _, sub_group in group_data.groupby("t_event_6"):
+        ax.plot(
+            sub_group["t_event"],
+            sub_group["group_mean"],
+            linewidth=2.5,
+            color=da.color[1] if pseudo_value == "pseudo-intervention" else da.color[0],
+        )
+
+# Vertical line at x = 0
+ax.axvline(x=0, color=da.color[2], linestyle="--", linewidth=3)
+
+# Customize labels and axis
+ax.set_xlabel("Event time: games before/after manager change")
+ax.set_ylabel("Average points")
+ax.set_xticks([-12, -6, -1, 1, 6, 12])
+ax.set_xlim(-12, 12)
+ax.set_yticks(np.arange(0, 1.8, 0.2))
+ax.set_ylim(0, 1.7)
+
+# Annotations
+ax.text(4, 0.1, "after", ha="center")
+ax.text(-6, 0.1, "before", ha="center")
+
+ax.legend(loc="lower right", bbox_to_anchor=(1.02, 0.12), frameon=False)
+da.add_margin(ax, x=0.05, y=0.02)
+```
+
+## REGRESSION with 6-game averages
+
+```{python}
+data_balanced_agg = (
+    data_balanced.assign(
+        teamseason=lambda df: df["team"] + "_" + df["season"].astype(str)
+    )
+    .assign(
+        t6_event=lambda df: pd.cut(
+            df["t_event"], bins=[-13, -6, 0, 1, 7, 13], right=False
+        )
+    )
+    .groupby(["teamseason", "t6_event"])
+    .agg(treated=("countinterv", "mean"), points6avg=("points", "mean"))
+    .reset_index()
+    .dropna()
+    .assign(Dp6avg=lambda df: df.groupby("teamseason")["points6avg"].transform("diff"))
+)
+```
+
+```{python}
+data_balanced_agg = pd.concat(
+    [data_balanced_agg, pd.get_dummies(data_balanced_agg["t6_event"])], axis=1
+).iloc[:, [0, 1, 2, 3, 4, 5, 6, 8, 9]]
+```
+
+```{python}
+data_balanced_agg.columns = [
+    "teamseason",
+    "t6_event",
+    "treated",
+    "points6avg",
+    "Dp6avg",
+    "before_7_12",
+    "before_1_6",
+    "after_1_6",
+    "after_7_12",
+]
+```
+
+```{python}
+data_balanced_agg[["before_7_12", "before_1_6", "after_1_6", "after_7_12"]] = (
+    data_balanced_agg[["before_7_12", "before_1_6", "after_1_6", "after_7_12"]].astype(
+        int
+    )
+)
+```
+
+```{python}
+data_balanced_agg[["Dp6avg", "after_1_6", "after_7_12"]].describe()
+```
+
+### FD REGRESSIONS
+
+```{python}
+fd_treatment = pf.feols(
+    "Dp6avg ~ after_1_6 + after_7_12",
+    data=data_balanced_agg.loc[lambda x: x["treated"] == 1],
+    vcov={"CRV1": "teamseason"},
+)
+fd_control = pf.feols(
+    "Dp6avg ~ after_1_6 + after_7_12",
+    data=data_balanced_agg.loc[lambda x: x["treated"] == 0],
+    vcov={"CRV1": "teamseason"},
+)
+fd = pf.feols(
+    "Dp6avg ~ after_1_6 + after_7_12 + treated + I(treated*after_1_6) + I(treated*after_7_12)",
+    data=data_balanced_agg,
+    vcov={"CRV1": "teamseason"},
+)
+```
+
+### Table 24.1 The effect of replacing managers: FD regressions with changes between six-game-average points
+
+```{python}
+pf.etable(
+    [fd_treatment, fd_control, fd],
+    model_heads=["Treatment", "Control", "Treatment + control"],
+    head_order="h",
+    labels={
+        "Intercept": "Constant",
+        "I(treated * after_1_6)": "treated × post 1 − 6",
+        "I(treated * after_7_12)": "treated × post 7 − 12",
+        "after_1_6": "post 1 − 6",
+        "after_7_12": "post 7 − 12",
+    },
+    show_se_type=False,
+    digits=2,
+)
+```
+
+### Extension, not included in the book
+
+FE regression
+
+```{python}
+fe_panel_treatment = pf.feols(
+    "points6avg ~ before_7_12 + after_1_6 + after_7_12 | teamseason",
+    data_balanced_agg.loc[lambda x: x["treated"] == 1],
+    vcov={"CRV1": "teamseason"},
+)
+fe_panel_control = pf.feols(
+    "points6avg ~ before_7_12 + after_1_6 + after_7_12 | teamseason",
+    data_balanced_agg.loc[lambda x: x["treated"] == 0],
+    vcov={"CRV1": "teamseason"},
+)
+fe_panel = pf.feols(
+    "points6avg ~ before_7_12 + after_1_6 + after_7_12 + treated*before_7_12 + treated*after_1_6 + treated*after_7_12 | teamseason",
+    data_balanced_agg,
+    vcov={"CRV1": "teamseason"},
+)
+```
+
+```{python}
+pf.etable(
+    [fe_panel_treatment, fe_panel_control, fe_panel],
+    custom_model_stats={
+        "Within R<sup>2</sup>": [
+            round(m._r2_within, 3)
+            for m in [fe_panel_treatment, fe_panel_control, fe_panel]
+        ]
+    },
+)
+```
+
+

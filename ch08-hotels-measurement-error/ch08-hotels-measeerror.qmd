@@ -1,0 +1,162 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 08
+**CH08C Measurement error in hotel ratings**
+
+using the hotels-vienna dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as smf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/hotels-vienna/clean/"
+data_out = dirname + "da_case_studies/ch08-hotels-measurement-error/"
+output = dirname + "da_case_studies/ch08-hotels-measurement-error/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# load vienna
+hotels = pd.read_csv(data_in + "hotels-vienna.csv")
+#data = pd.read_csv("https://osf.io/y6jvb/download")
+```
+
+#### SAMPLE SELECTION
+
+```{python}
+# hotels = hotels.query(
+#     'accommodation_type == "Hotel" and '
+#     'city_actual == "Vienna" and '
+#     '3 <= stars <= 4 and '
+#     'price <= 600'
+# )
+```
+
+```{python}
+hotels = hotels.loc[
+    (hotels["accommodation_type"] == "Hotel")
+    & (hotels["city_actual"] == "Vienna")
+    & (hotels["stars"] >= 3)
+    & (hotels["stars"] <= 4)
+    & (hotels["stars"].notna())
+    & (hotels["price"] <= 600)
+]
+```
+
+### Look at measurement error by rating count
+
+```{python}
+hotels["lnprice"] = np.log(hotels["price"])
+```
+
+```{python}
+# define cutoffs
+k1 = 100
+k2 = 200
+```
+
+```{python}
+reg_me = smf.ols(
+    formula="lnprice ~ rating", data=hotels.loc[hotels["rating_count"] < k1, :]
+)
+reg_me_fit = reg_me.fit()
+```
+
+```{python}
+print(reg_me_fit.summary())
+```
+
+```{python}
+hotels["yhat"] = reg_me_fit.predict(hotels)
+```
+
+```{python}
+reg_me2 = smf.ols(
+    formula="lnprice ~ rating",
+    data=hotels.loc[(hotels["rating_count"] >= k1) & (hotels["rating_count"] < k2), :],
+)
+reg_me_fit2 = reg_me2.fit()
+reg_me_fit2.summary()
+```
+
+```{python}
+hotels["yhat2"] = reg_me_fit2.predict(hotels)
+```
+
+```{python}
+reg_me3 = smf.ols(
+    formula="lnprice ~ rating", data=hotels.loc[hotels["rating_count"] >= k2, :]
+)
+reg_me_fit3 = reg_me3.fit()
+reg_me_fit3.summary()
+```
+
+```{python}
+hotels["yhat3"] = reg_me_fit3.predict(hotels)
+```
+
+```{python}
+plt.plot(
+    hotels["rating"], hotels["yhat"], color=da.color[1], linewidth=1.5, label="yhat"
+)
+plt.plot(
+    hotels["rating"], hotels["yhat3"], color=da.color[0], linewidth=1.5, label="yhat3"
+)
+
+plt.text(2.3, 4.4, "More noisy: # of ratings<100", fontsize=10, color=da.color[1])
+plt.text(2.7, 3.6, "Less noisy: # of ratings>200", fontsize=10, color=da.color[0])
+
+plt.xlim(1.9, 5.1)
+plt.ylim(3.4, 5.1)
+plt.xticks(np.arange(2, 5.1, 0.5))
+plt.yticks(np.arange(3.5, 5.1, 0.5))
+plt.xlabel("Average rating", fontsize=12)
+plt.ylabel("ln(Hotel price, US dollars)", fontsize=12)
+
+
+plt.show()
+```
+
+

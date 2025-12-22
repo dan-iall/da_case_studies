@@ -1,0 +1,486 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 09
+**CH09A Estimating gender and age differences in earnings**
+
+using the cps-earnings dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+import statsmodels.nonparametric.kernel_regression as loess
+from matplotlib.ticker import PercentFormatter
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/cps-earnings/clean/"
+data_out = dirname + "da_case_studies/ch09-gender-age-earnings/"
+output = dirname + "da_case_studies/ch09-gender-age-earnings/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+#data_all = pd.read_csv(data_in + "morg-2014-emp.csv")
+data_all = pd.read_csv("https://osf.io/download/4ay9x/")
+
+```
+
+### SELECT OCCUPATION
+
+keep only two occupation types: Market research analysts and marketing specialists and Computer and Mathematical Occupations
+
+```{python}
+data_all.loc[data_all['occ2012'] == 735, 'sample'] = 1
+data_all.loc[
+    ((data_all['occ2012'] >= 1005) & (data_all['occ2012'] <= 1240)), 'sample'
+] = 2
+data_all.loc[data_all['sample'].isna(), 'sample'] = 0
+```
+
+```{python}
+conditions = [
+    data_all['occ2012'] == 735,
+    data_all['occ2012'].between(1005, 1240)
+]
+choices = [1, 2]
+data_all['sample'] = np.select(conditions, choices, default=0)
+```
+
+```{python}
+data_all = data_all.loc[
+    (data_all["sample"] == 1) | (data_all["sample"] == 2), :
+].reset_index(drop=True)
+```
+
+```{python}
+data_all["sample"].value_counts()
+```
+
+```{python}
+data_all["female"] = (data_all["sex"] == 2).astype(int)
+data_all["w"] = data_all["earnwke"] / data_all["uhours"]
+data_all["lnw"] = np.log(data_all["w"])
+data_all["agesq"] = np.power(data_all["age"], 2)
+```
+
+```{python}
+i = 1
+data = data_all.loc[data_all["sample"] == i, :].reset_index(drop=True)
+data.to_csv(data_out + "earnings_inference.csv", index=False)
+```
+
+### DISTRIBUTION OF EARNINGS
+
+```{python}
+data.loc[:, ["earnwke", "uhours", "w"]].describe()
+```
+
+```{python}
+data.loc[data["w"] >= 1, ["earnwke", "uhours", "w"]].describe()
+```
+
+```{python}
+data["female"].value_counts()
+```
+
+```{python}
+data.groupby(["occ2012", "female"]).size()
+```
+
+### Linear regressions
+
+```{python}
+reg1 = pf.feols("lnw~female", data=data)
+pf.etable(reg1)
+```
+
+```{python}
+reg2 = pf.feols("lnw~female", data=data,vcov="HC1")
+pf.etable(reg2)
+```
+
+### Table 9.1 Wage and gender gap baseline regression
+
+```{python}
+pf.etable([reg1,reg2],
+          labels={"Intercept":"Constant"})
+```
+
+```{python}
+reg3 = pf.feols("lnw~age", data=data,vcov="HC1")
+pf.etable(reg3)
+```
+
+```{python}
+reg4 = pf.feols("lnw~age+agesq", data=data,vcov="HC1")
+pf.etable(reg4)
+```
+
+```{python}
+from py_helper_functions import lspline
+```
+
+```{python}
+reg5 = pf.feols("lnw~lspline(age,[30,40])", data=data,vcov="HC1",context=0)
+pf.etable(reg5)
+```
+
+```{python}
+reg6 = loess.KernelReg(data["lnw"], data["age"], var_type="c", reg_type="lc")
+```
+
+```{python}
+reg6
+```
+
+### Table 9.2 Wage and age – different specifications
+
+```{python}
+pf.etable([reg3,reg4,reg5],
+          labels={
+        "Intercept": "Constant",
+        "agesq": "age squared",
+        "lspline(age, [30, 40])[0]": "age spline <30",
+        "lspline(age, [30, 40])[1]": "age spline 30–40",
+        "lspline(age, [30, 40])[2]": "age spline 40<",
+    }
+)
+```
+
+### Figure 9.3 Log hourly wage and age: regressions that capture nonlinearity
+
+(a) Lowess regression and scatterplot
+
+```{python}
+sns.scatterplot(data=data, x="age", y="lnw")
+da.plot_loess(data=data, x="age", y="lnw",span=0.8,color=da.color[1])
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour)", fontsize=12)
+plt.xlim(19, 66)
+plt.xticks(np.arange(20, 66, 5))  
+plt.ylim(1.4, 4.6)
+plt.yticks(np.arange(1.5, 4.6, 0.5))  
+
+
+plt.show()
+```
+
+```{python}
+pf.etable(reg4)
+```
+
+```{python}
+z = reg4.predict(interval="prediction")
+```
+
+```{python}
+data["lnwpred_ageq"] = z["fit"]
+data["lnwpred_ageqCIUP"] = z["fit"] + 1.95 * z["se_fit"]
+data["lnwpred_ageqCILO"] = z["fit"] - 1.95 * z["se_fit"]
+```
+
+```{python}
+z = reg5.predict(interval="prediction")
+```
+
+```{python}
+data["lnwpred_agesp"] = z["fit"]
+data["lnwpred_agespCIUP"] = z["fit"] + 1.95 * z["se_fit"]
+data["lnwpred_agespCILO"] = z["fit"] - 1.95 * z["se_fit"]
+```
+
+```{python}
+data["lnwpred_agel"] = reg6.fit()[0]
+```
+
+(b) Lowess, piecewise linear spline, and quadratic
+
+```{python}
+plotdata = data.filter(["age", "lnwpred_agel", "lnwpred_ageq", "lnwpred_agesp"]).melt(
+    id_vars=["age"]
+)
+```
+
+```{python}
+palette = {
+    "lnwpred_agel": da.color[0],
+    "lnwpred_ageq": da.color[2],
+    "lnwpred_agesp": da.color[1]
+}
+legend_labels = {
+    "lnwpred_agel": "Loess",
+    "lnwpred_ageq": "Quadratic",
+    "lnwpred_agesp": "Piecewise linear spline"
+}
+
+sns.lineplot(
+    data=plotdata,
+    x="age",
+    y="value",
+    hue="variable",
+    style="variable",
+    palette=palette,
+    style_order=["lnwpred_agel","lnwpred_agesp","lnwpred_ageq"],
+    linewidth=2.5
+)
+
+handles, labels = plt.gca().get_legend_handles_labels()
+new_labels = [legend_labels[label] for label in labels if label in legend_labels]
+plt.legend(
+    handles=handles[:len(new_labels)],
+    labels=new_labels,
+    title="",
+    loc="lower center",
+    bbox_to_anchor=(0.6, 0.1),
+    ncol=3,
+    frameon=False
+)
+
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour)", fontsize=12)
+plt.xlim(19, 66)
+plt.xticks(np.arange(20, 66, 5))  
+plt.ylim(2.3, 3.7)
+plt.yticks(np.arange(2.4, 3.7, 0.2))  
+
+plt.show()
+```
+
+### Figure 9.4 Average log earnings and age: regressions with CI
+
+```{python}
+plotdata = (
+    data.filter(
+        [
+            "age",
+            "lnwpred_agel",
+            "lnwpred_ageq",
+            "lnwpred_agesp",
+            "lnwpred_ageqCIUP",
+            "lnwpred_ageqCILO",
+            "lnwpred_agespCIUP",
+            "lnwpred_agespCILO",
+        ]
+    )
+    .melt(id_vars=["age"])
+    .assign(CI=lambda x: x["variable"].str.contains("CI"))
+    .assign(
+        estimate=lambda x: np.where(x["CI"], x["variable"].str[:-4], x["variable"]),
+    )
+)
+```
+
+```{python}
+# This is for filling the area between the lines
+plotdata_no_duplicates = (
+    plotdata
+    .groupby(["age", "estimate", "CI","variable"], as_index=False)
+    .agg({"value": "mean"})
+)
+
+# We need the data in wide format because of how plt.fill_between works
+plotdata_wide = plotdata_no_duplicates.pivot(
+    index=["age"],
+    columns="variable",
+    values="value"
+).reset_index()
+```
+
+```{python}
+plotdata_wide.head()
+```
+
+```{python}
+palette = {
+    "lnwpred_agel": da.color[0],
+    "lnwpred_ageq": da.color[2],
+    "lnwpred_agesp": da.color[1]
+}
+
+legend_labels = {
+    "lnwpred_agel": "Loess",
+    "lnwpred_ageq": "Quadratic",
+    "lnwpred_agesp": "Piecewise linear spline"
+}
+
+sns.lineplot(
+    data=plotdata,
+    x="age",
+    y="value",
+    hue="estimate",
+    style="estimate",
+    size="CI",
+    palette=palette,
+    style_order=["lnwpred_agel","lnwpred_agesp","lnwpred_ageq"],
+    sizes={False: 2.5, True: 0.7},
+    linewidth=1.5,
+    units="variable",
+    estimator=None
+)
+
+handles, labels = plt.gca().get_legend_handles_labels()
+new_labels = [legend_labels[label] for label in labels if label in legend_labels]
+plt.legend(
+    handles=handles[1:len(new_labels)+ 1],
+    labels=new_labels,
+    title="",
+    loc="lower center",
+    bbox_to_anchor=(0.6, 0.2),
+    ncol=3,
+    frameon=False
+)
+plt.fill_between(
+    plotdata_wide["age"],
+    plotdata_wide["lnwpred_ageqCILO"],
+    plotdata_wide["lnwpred_ageqCIUP"],
+    color=da.color[2],
+    alpha=0.2,
+)
+
+plt.fill_between(
+    plotdata_wide["age"],
+    plotdata_wide["lnwpred_agespCILO"],
+    plotdata_wide["lnwpred_agespCIUP"],
+    color=da.color[1],
+    alpha=0.2,
+)
+
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour)", fontsize=12)
+plt.xlim(19, 66)
+plt.xticks(np.arange(20, 66, 5))  
+plt.ylim(2.3, 3.7)
+plt.yticks(np.arange(2.4, 3.7, 0.2))  
+plt.show()
+```
+
+### Figure 9.2 Log hourly wage and age: regression line, confidence interval, prediction interval.
+
+```{python}
+reg7 = pf.feols("lnw~age", data=data.loc[data["sample"] == 1])
+```
+
+(a) Confidence interval
+
+```{python}
+z = reg7.predict(interval="prediction")
+```
+
+```{python}
+interval_data = data.join(
+    pd.DataFrame(reg7.predict(interval="prediction")["ci_high"].rename("pi_high"))
+).join(
+    reg7.predict(interval="prediction")["ci_low"].rename("pi_low")
+)
+```
+
+```{python}
+interval_data["ci_low"] = z["fit"] - 1.95 * z["se_fit"]
+interval_data["ci_up"] = z["fit"] + 1.95 * z["se_fit"]
+```
+
+```{python}
+sns.regplot(data=interval_data, x="age", y="lnw",ci=False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 10))
+sns.lineplot(data=interval_data, x="age", y="ci_low",ci=False,estimator=None,linestyle = "dashed",linewidth = 1,color = da.color[1])
+sns.lineplot(data=interval_data, x="age", y="ci_up",ci=False,estimator=None,linestyle = "dashed",linewidth = 1,color = da.color[1])
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour)", fontsize=12)
+plt.xlim(19, 66)
+plt.xticks(np.arange(20, 66, 5))  
+plt.ylim(1.4, 4.6)
+plt.yticks(np.arange(1.5, 4.6, 0.5))  
+plt.show()
+```
+
+```{python}
+sns.regplot(data=interval_data, x="age", y="lnw",ci=False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 20))
+sns.lineplot(data=interval_data, x="age", y="pi_high",ci=False,estimator=None,linestyle = "dashed",linewidth = 1,color = da.color[1])
+sns.lineplot(data=interval_data, x="age", y="pi_low",ci=False,estimator=None,linestyle = "dashed",linewidth = 1,color = da.color[1])
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour)", fontsize=12)
+plt.xlim(19, 66)
+plt.xticks(np.arange(20, 66, 5))  
+plt.ylim(1.4, 4.6)
+plt.yticks(np.arange(1.5, 4.6, 0.5))  
+plt.show()
+```
+
+### Figure 9.1 Bootstrap distribution of the average female–male wage difference among market analysts
+
+```{python}
+data = pd.read_csv(data_out + "earnings_inference.csv")
+```
+
+```{python}
+results = da.bs_linreg(data.lnw.values, data.female.values, size=1000)
+
+b_earnings_female = pd.DataFrame(results).T
+
+b_earnings_female.columns = ["_b_intercept", "_b_female"]
+```
+
+```{python}
+mean_management = b_earnings_female["_b_female"].mean()
+sns.histplot(
+    data=b_earnings_female,
+    x="_b_female",
+    binwidth=0.025,  
+    binrange=(-0.3,0.1),
+    color=da.color[0],
+    edgecolor="white",
+    stat="probability",  
+    alpha=1,
+)
+plt.plot([mean_management,mean_management],
+             [0,0.2],linewidth = 1.5,color = da.color[1])
+plt.text(-0.08, 0.18, "mean", fontsize=14)
+
+plt.xlabel("Slope coefficients from bootstrap samples")
+plt.ylabel("Percent")
+plt.ylim(0, 0.2)
+plt.yticks(ticks=np.arange(0, 0.21, 0.05))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.xlim(-0.31, 0.17)
+plt.xticks(ticks=np.arange(-0.3, 0.11, 0.1))
+plt.show()
+```
+
+

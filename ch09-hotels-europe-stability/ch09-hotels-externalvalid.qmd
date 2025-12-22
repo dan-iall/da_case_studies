@@ -1,0 +1,341 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 09
+**CH09B How stable is the hotel price - distance to center relationship?**
+
+using the hotels-europe dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+import pyfixest as pf
+import numpy as np
+import pandas as pd
+
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/hotels-europe/clean/"
+data_out = dirname + "da_case_studies/ch09-hotels-europe-stability/"
+output = dirname + "da_case_studies/ch09-hotels-europe-stability/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+```
+
+```{python}
+# load in clean and tidy data and create workfile
+hotels_europe_price = pd.read_csv(data_in + "hotels-europe_price.csv")
+hotels_europe_features = pd.read_csv(data_in + "hotels-europe_features.csv")
+
+#hotels_europe_price = pd.read_csv("https://osf.io/download/p6tyr/")
+#hotels_europe_features = pd.read_csv("https://osf.io/download/utwjs/")
+```
+
+```{python}
+data = pd.merge(hotels_europe_price, hotels_europe_features, on="hotel_id", how="left")
+```
+
+```{python}
+# filter a few cities
+data = data.loc[data["city_actual"].isin(["Vienna", "Amsterdam", "Barcelona"])]
+```
+
+```{python}
+data = data.loc[data["accommodation_type"].isin(["Hotel", "Apartment"])]
+```
+
+```{python}
+# drop long stay , 1000E+
+data = data[data["nnights"] != 4]
+data = data[data["price"] < 1000]
+```
+
+```{python}
+# check for duplicates
+data = data.drop_duplicates()
+```
+
+```{python}
+# filter for days
+data.loc[(data["month"] == 11) & (data["weekend"] == 0), "date"] = "2017-NOV-weekday"
+data.loc[(data["month"] == 11) & (data["weekend"] == 1), "date"] = "2017-NOV-weekend"
+data.loc[(data["month"] == 12) & (data["holiday"] == 1), "date"] = "2017-DEC-holiday"
+data.loc[(data["month"] == 6) & (data["weekend"] == 1), "date"] = "2018-JUNE-weekend"
+```
+
+```{python}
+data = data[data["date"].notna()]
+```
+
+```{python}
+data["city"].value_counts()
+```
+
+```{python}
+pd.crosstab(index=data["accommodation_type"], columns=data["city"])
+```
+
+```{python}
+pd.crosstab(index=data["date"], columns=data["city"])
+```
+
+```{python}
+data["lnprice"] = np.log(data["price"])
+```
+
+```{python}
+data = data.filter(
+    [
+        "hotel_id",
+        "date",
+        "city",
+        "accommodation_type",
+        "stars",
+        "rating",
+        "distance",
+        "price",
+        "lnprice",
+    ]
+)
+```
+
+```{python}
+data.to_csv(os.path.join(data_out, "hotels_work.csv"), index=False)
+```
+
+```{python}
+data = data.loc[
+    (data["stars"] >= 3)
+    & (data["stars"] <= 4)
+    & (data["accommodation_type"] == "Hotel")
+    & (data["city"] == "Vienna")
+]
+```
+
+```{python}
+data["date"].value_counts()
+```
+
+```{python}
+data[["distance", "price", "lnprice"]].describe().round(2)
+```
+
+```{python}
+data.groupby("date")["distance"].describe().round(3)
+```
+
+```{python}
+data.groupby("date")["price"].describe().round(3)
+```
+
+```{python}
+data.groupby("date")["lnprice"].describe().round(3)
+```
+
+## Regression with splines
+
+### Table 9.3 External validity – comparing dates
+
+```{python}
+dates = [
+    "2017-NOV-weekday",
+    "2017-NOV-weekend",
+    "2017-DEC-holiday",
+    "2018-JUNE-weekend",
+]
+```
+
+```{python}
+from py_helper_functions import lspline
+```
+
+```{python}
+models = []
+for date in dates:
+    models.append(
+         pf.feols("lnprice ~ lspline(distance,[2])", data=data.loc[lambda x: x["date"] == date],vcov="HC1",context=0)
+    )
+```
+
+```{python}
+pf.etable(
+    models,
+    model_heads=dates,
+    labels={
+        "Intercept": "Constant",
+        "lspline(distance, [2])[0]": "Distance spline <2",
+        "lspline(distance, [2])[1]": "Distance spline 2–7"
+    },
+)
+```
+
+### Table 9.4 External validity – comparing dates 2
+
+```{python}
+data["hotelcount"] = data.groupby("hotel_id")["city"].transform("count")
+```
+
+```{python}
+data["hotelcount"].value_counts().sort_index()
+```
+
+```{python}
+models = []
+for date in dates:
+    models.append(
+         pf.feols("lnprice ~ lspline(distance,[2])",data=data.loc[lambda x: (x["date"] == date) & (x["hotelcount"] == 4)],vcov="HC1",context=0)
+    )
+```
+
+```{python}
+pf.etable(
+    models,
+    model_heads=dates,
+    labels={
+        "Intercept": "Constant",
+        "lspline(distance, [2])[0]": "Distance spline <2",
+        "lspline(distance, [2])[1]": "Distance spline 2–7"
+    },
+)
+```
+
+### Table 9.5 External validity – comparing cities
+
+```{python}
+data = pd.read_csv(os.path.join(data_out, "hotels_work.csv"), index_col=0)
+```
+
+```{python}
+data = data.loc[
+    lambda x: (x["stars"] >= 3)
+    & (x["stars"] <= 4)
+    & (x["date"] == "2017-NOV-weekday")
+    & (x["accommodation_type"] == "Hotel")
+]
+```
+
+```{python}
+pd.crosstab(index=data["city"], columns=data["stars"])
+```
+
+```{python}
+data.groupby("stars")["distance"].describe()
+```
+
+```{python}
+data.groupby("price")["distance"].describe()
+```
+
+```{python}
+data.groupby("price")["distance"].describe()
+```
+
+```{python}
+cities = ["Vienna", "Amsterdam", "Barcelona"]
+```
+
+```{python}
+models = []
+for city in cities:
+    models.append(
+         pf.feols("lnprice ~ lspline(distance,[2])",data=data.loc[lambda x: x["city"] == city],vcov="HC1",context=0)
+    )
+```
+
+```{python}
+pf.etable(
+    models,
+    model_heads=cities,
+    labels={
+        "Intercept": "Constant",
+        "lspline(distance, [2])[0]": "Distance spline <2",
+        "lspline(distance, [2])[1]": "Distance spline 2–7"
+    },
+)
+```
+
+### Table 9.6 External validity – accommodation types
+
+```{python}
+data = pd.read_csv(os.path.join(data_out, "hotels_work.csv"), index_col=0)
+```
+
+```{python}
+data = data.loc[
+    lambda x: (x["stars"] >= 3)
+    & (x["stars"] <= 4)
+    & (x["date"] == "2017-NOV-weekday")
+    & (x["city"] == "Vienna")
+]
+```
+
+```{python}
+pd.crosstab(index=data["accommodation_type"], columns=data["stars"])
+```
+
+```{python}
+data.groupby("stars")["distance"].describe()
+```
+
+```{python}
+data.groupby("price")["distance"].describe()
+```
+
+```{python}
+data.groupby("lnprice")["distance"].describe()
+```
+
+```{python}
+accommodation_types = ["Hotel", "Apartment"]
+```
+
+```{python}
+models = []
+for atype in accommodation_types:
+    models.append(
+         pf.feols("lnprice ~ lspline(distance,[2])",data=data.loc[lambda x: x["accommodation_type"] == atype],vcov="HC1",context=0)
+    )
+```
+
+```{python}
+pf.etable(
+    models,
+    model_heads=accommodation_types,
+    labels={
+        "Intercept": "Constant",
+        "lspline(distance, [2])[0]": "Distance spline <2",
+        "lspline(distance, [2])[1]": "Distance spline 2–7"
+    },
+)
+```
+

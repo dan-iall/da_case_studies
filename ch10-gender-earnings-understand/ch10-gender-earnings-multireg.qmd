@@ -1,0 +1,366 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 10
+**CH10A Understanding the gender difference in earnings**
+
+using the cps-earnings dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/cps-earnings/clean/"
+data_out = dirname + "da_case_studies/ch10-gender-earnings-understand/"
+output = dirname + "da_case_studies/ch10-gender-earnings-understand/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+#cps = pd.read_csv(data_in + "morg-2014-emp.csv") 
+cps= pd.read_csv("https://osf.io/download/4ay9x/")
+```
+
+```{python}
+cps = cps.query("uhours>=20 & earnwke>0 & age>=24 & age<=64 & grade92>=44")
+```
+
+```{python}
+# CREATE VARIABLES
+cps["female"] = (cps.sex == 2).astype(int)
+cps["w"] = cps["earnwke"] / cps["uhours"]
+cps["lnw"] = np.log(cps["w"])
+## Write out to csv
+cps.to_csv(data_out + "earnings_multireg.csv")
+```
+
+```{python}
+#####################
+# DISTRIBUTION OF EARNINGS
+#######################
+cps.loc[:, ["earnwke", "uhours", "w"]].describe()
+```
+
+```{python}
+cps.loc[cps.w >= 1, ["earnwke", "uhours", "w"]].describe()
+```
+
+### Table 10.1 Gender differences in earnings – log earnings and gender
+
+```{python}
+reg = pf.feols("lnw~female", data=cps,vcov="HC1")
+reg2 = pf.feols("lnw~female+age", data=cps,vcov="HC1")
+reg3 = pf.feols("age~female", data=cps,vcov="HC1")
+```
+
+```{python}
+pf.etable([reg,reg2,reg3],
+          head_order="h",
+          model_heads=["ln wage","lnwage", "age"],
+          labels={"Intercept": "Constant"}          
+)
+```
+
+```{python}
+cps['female2'] = cps['female'].apply(lambda x: 'Male' if x == 0 else 'Female')
+g = sns.FacetGrid(cps, col="female2",height=5, aspect=0.7,col_order=["Male","Female"])
+g.map_dataframe(sns.histplot, x="age",
+                binwidth=4,  
+                binrange=(27,62),
+                #color=da.color[0],
+                edgecolor="white",
+                stat="probability",  
+                alpha=1)
+g.set_titles(col_template="{col_name}")
+#g.figure(figsize = (10,8))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.ylim(0, 0.16)
+plt.yticks(ticks=np.arange(0, 0.15, 0.02))
+plt.xlim(22,65)
+plt.xticks(ticks=np.arange(25, 66, 5))
+plt.show()
+```
+
+```{python}
+sns.kdeplot(
+    data=cps,
+    x="age",
+    hue="female",
+    bw_adjust=1.5,
+    common_norm=False,
+    linewidth=3,
+    palette={0: da.color[1], 1: da.color[0]},
+    legend=False,
+)
+plt.xlim(24, 65)
+plt.xticks(ticks=np.arange(25, 61, 5))
+plt.yticks(ticks=np.arange(0, 0.041, 0.01))
+plt.annotate(
+    "Male", xy=(55, 0.028), xytext=(55, 0.028), fontsize=12, color=da.color[1], ha="center"
+)
+plt.annotate(
+    "Female", xy=(55, 0.02), xytext=(55, 0.02), fontsize=12, color=da.color[0], ha="center"
+)
+plt.xlabel("Age (years)")
+plt.show()
+```
+
+### Table 10.2 Gender differences in earnings – log earnings and age, various functional forms
+
+```{python}
+cps["agesq"] = np.power(cps["age"], 2)
+cps["agecu"] = np.power(cps["age"], 3)
+cps["agequ"] = np.power(cps["age"], 4)
+```
+
+```{python}
+reg4 = pf.feols("lnw~female", data=cps,vcov="HC1")
+reg5 = pf.feols("lnw~female+age", data=cps,vcov="HC1")
+reg6 = pf.feols("lnw~female+age+agesq", data=cps,vcov="HC1")
+reg7 = pf.feols("lnw~female+age+agesq+agecu+agequ", data=cps,vcov="HC1")
+```
+
+```{python}
+pf.etable([reg4,reg5,reg6,reg7],
+          labels={"Intercept": "Constant"}          
+)
+```
+
+### Table 10.3 Gender differences in earnings – log earnings, gender and education
+
+```{python}
+cps["ed_MA"] = (cps["grade92"] == 44).astype(int)
+cps["ed_Profess"] = (cps["grade92"] == 45).astype(int)
+cps["ed_Phd"] = (cps["grade92"] == 46).astype(int)
+```
+
+```{python}
+reg8 = pf.feols("lnw~female", data=cps,vcov="HC1")
+reg9 = pf.feols("lnw~female + ed_Profess + ed_Phd", data=cps,vcov="HC1")
+reg10 = pf.feols("lnw~female + ed_Profess + ed_MA", data=cps,vcov="HC1")
+```
+
+```{python}
+pf.etable([reg8,reg9,reg10],
+          labels={"Intercept": "Constant"}          
+)
+```
+
+### Table 10.4 Gender differences in earnings – log earnings, gender, age, and their interaction
+
+```{python}
+reg11 = pf.feols("lnw~age", data=cps.query("female==1"),vcov="HC1")
+reg12 = pf.feols("lnw~age", data=cps.query("female==0"),vcov="HC1")
+reg13 = pf.feols("lnw~female+age+age*female", data=cps,vcov="HC1")
+```
+
+```{python}
+pf.etable([reg11,reg12,reg13],
+          labels={"Intercept": "Constant"}          
+)
+```
+
+### Figure 10.2 Earning differences by gender as function of age
+FOR RPEDICTIONL FUNCTIONAL FORMS & INTERACTIONS WITH GENDER
+
+```{python}
+reg14 = pf.feols("lnw~age+agesq+agecu+agequ", data=cps.query("female==1"),vcov="HC1")
+reg15 = pf.feols("lnw~age+agesq+agecu+agequ", data=cps.query("female==0"),vcov="HC1")
+reg16 = pf.feols("lnw ~ age + agesq + agecu + agequ + female + female*age + female*agesq + female*agecu + female*agequ",
+    data=cps,vcov="HC1")
+```
+
+```{python}
+pf.etable([reg14,reg15,reg16],
+          labels={"Intercept": "Constant"}          
+)
+```
+
+```{python}
+data_m = cps.query("female==0")
+pred = reg13.predict(data_m,interval="prediction")[["fit","se_fit"]]
+
+data_m = data_m.reset_index(drop=True).join(pred)
+
+data_m["CIup"] = data_m["fit"] + 1.95 * data_m["se_fit"]
+data_m["CIlo"] = data_m["fit"] - 1.95 * data_m["se_fit"]
+
+
+data_f = cps.query("female==1")
+pred = reg13.predict(data_f,interval="prediction")[["fit","se_fit"]]
+
+data_f = data_f.reset_index(drop=True).join(pred)
+
+data_f["CIup"] = data_f["fit"] + 1.95 * data_f["se_fit"]
+data_f["CIlo"] = data_f["fit"] - 1.95 * data_f["se_fit"]
+```
+
+```{python}
+sns.lineplot(data=data_m,x="age",y="fit",linewidth=1,estimator=None,ci=False)
+sns.lineplot(data=data_m,x="age",y="CIup",linewidth=1,estimator=None,ci=False,color = da.color[0],linestyle = "dashed")
+sns.lineplot(data=data_m,x="age",y="CIlo",linewidth=1,estimator=None,ci=False,color = da.color[0],linestyle = "dashed")
+
+sns.lineplot(data=data_f,x="age",y="fit",linewidth=1,estimator=None,ci=False,color = da.color[1])
+sns.lineplot(data=data_f,x="age",y="CIup",linewidth=1,estimator=None,ci=False,color = da.color[1],linestyle = "dashed")
+sns.lineplot(data=data_f,x="age",y="CIlo",linewidth=1,estimator=None,ci=False,color = da.color[1],linestyle = "dashed")
+
+
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour, US dollars)", fontsize=12)
+plt.xlim(24,66)
+plt.xticks(ticks=np.arange(25, 66, 5))
+plt.ylim(2.7,3.82)
+plt.yticks(ticks=np.arange(2.8, 3.9, 0.1))
+
+plt.show()
+```
+
+```{python}
+data_m = cps.query("female==0")
+pred = reg16.predict(data_m,interval="prediction")[["fit","se_fit"]]
+
+data_m = data_m.reset_index(drop=True).join(pred)
+
+data_m["CIup"] = data_m["fit"] + 1.95 * data_m["se_fit"]
+data_m["CIlo"] = data_m["fit"] - 1.95 * data_m["se_fit"]
+
+
+data_f = cps.query("female==1")
+pred = reg16.predict(data_f,interval="prediction")[["fit","se_fit"]]
+
+data_f = data_f.reset_index(drop=True).join(pred)
+
+data_f["CIup"] = data_f["fit"] + 1.95 * data_f["se_fit"]
+data_f["CIlo"] = data_f["fit"] - 1.95 * data_f["se_fit"]
+```
+
+```{python}
+sns.lineplot(data=data_m,x="age",y="fit",linewidth=1,estimator=None,ci=False)
+sns.lineplot(data=data_m,x="age",y="CIup",linewidth=1,estimator=None,ci=False,color = da.color[0],linestyle = "dashed")
+sns.lineplot(data=data_m,x="age",y="CIlo",linewidth=1,estimator=None,ci=False,color = da.color[0],linestyle = "dashed")
+
+sns.lineplot(data=data_f,x="age",y="fit",linewidth=1,estimator=None,ci=False,color = da.color[1])
+sns.lineplot(data=data_f,x="age",y="CIup",linewidth=1,estimator=None,ci=False,color = da.color[1],linestyle = "dashed")
+sns.lineplot(data=data_f,x="age",y="CIlo",linewidth=1,estimator=None,ci=False,color = da.color[1],linestyle = "dashed")
+
+
+plt.xlabel("Age (years)", fontsize=12)
+plt.ylabel("ln(earnings per hour, US dollars)", fontsize=12)
+plt.xlim(24,66)
+plt.xticks(ticks=np.arange(25, 66, 5))
+plt.ylim(2.7,3.82)
+plt.yticks(ticks=np.arange(2.8, 3.9, 0.1))
+
+plt.show()
+```
+
+## Part 2
+TOWARDS CAUSAL ANALYIS - IS IT DISCRIMINATION?
+
+```{python}
+# FILTER DATA -  SELECTION of the sample we need
+cps = cps.query("age>=40 & age<=60")
+```
+
+```{python}
+cps["white"] = (cps["race"] == 1).astype(int)
+cps["afram"] = (cps["race"] == 2).astype(int)
+cps["asian"] = (cps["race"] == 4).astype(int)
+cps["hisp"] = (cps["ethnic"].notna()).astype(int)
+cps["othernonw"] = (
+    (cps["white"] == 0) & (cps["afram"] == 0) & (cps["asian"] == 0) & (cps["hisp"] == 0)
+).astype(int)
+cps["nonUSborn"] = (
+    (cps["prcitshp"] == "Foreign Born, US Cit By Naturalization")
+    | (cps["prcitshp"] == "Foreign Born, Not a US Citizen")
+).astype(int)
+```
+
+```{python}
+# Potentially endogeneous demographics
+cps["married"] = ((cps["marital"] == 1) | (cps["marital"] == 2)).astype(int)
+cps["divorced"] = ((cps["marital"] == 3) & (cps["marital"] == 5)).astype(int)
+cps["wirowed"] = (cps["marital"] == 4).astype(int)
+cps["nevermar"] = (cps["marital"] == 7).astype(int)
+
+cps["child0"] = (cps["chldpres"] == 0).astype(int)
+cps["child1"] = (cps["chldpres"] == 1).astype(int)
+cps["child2"] = (cps["chldpres"] == 2).astype(int)
+cps["child3"] = (cps["chldpres"] == 3).astype(int)
+cps["child4pl"] = (cps["chldpres"] >= 4).astype(int)
+
+# Work-related variables
+cps["fedgov"] = (cps["class"] == "Government - Federal").astype(int)
+cps["stagov"] = (cps["class"] == "Government - State").astype(int)
+cps["locgov"] = (cps["class"] == "Government - Local").astype(int)
+cps["nonprof"] = (cps["class"] == "Private, Nonprofit").astype(int)
+cps["ind2dig"] = ((pd.Categorical(cps["ind02"]).codes + 1) / 100).astype(int)
+cps["occ2dig"] = (cps["occ2012"] / 100).astype(int)
+cps["union"] = ((cps["unionmme"] == "Yes") | (cps["unioncov"] == "Yes")).astype(int)
+```
+
+```{python}
+cps["uhourssq"] = np.power(cps["uhours"], 2)
+cps["uhourscu"] = np.power(cps["uhours"], 3)
+cps["uhoursqu"] = np.power(cps["uhours"], 4)
+```
+
+### Table 10.5 Gender differences in earnings – regression with many covariates on a narrower sample
+
+```{python}
+reg1 = pf.feols("lnw ~ female", data=cps,vcov="HC1")
+reg2 = pf.feols("lnw ~ female + age + ed_Profess + ed_Phd", data=cps,vcov="HC1")
+reg3 = pf.feols("lnw ~ female + age + afram + hisp + asian + othernonw + nonUSborn + ed_Profess + ed_Phd + married + divorced+ wirowed + child1 + child2 + child3 +child4pl + C(stfips) + uhours + fedgov + stagov + locgov + nonprof + union + C(ind2dig) + C(occ2dig)",
+    data=cps,vcov="HC1"
+)
+reg4 = pf.feols("lnw ~ female + age + afram + hisp + asian + othernonw + nonUSborn + ed_Profess + ed_Phd + married + divorced+ wirowed + child1 + child2 + child3 +child4pl + C(stfips) + uhours + fedgov + stagov + locgov + nonprof + union + C(ind2dig) + C(occ2dig) + agesq + agecu + agequ + uhoursqu + uhourscu + uhourssq",
+    data=cps,vcov="HC1"
+)
+```
+
+```{python}
+pf.etable([reg1,reg2,reg3,reg4],
+          keep=["female","Intercept"],
+          labels={"Intercept": "Constant"}   
+)
+```
+

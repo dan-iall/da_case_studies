@@ -1,0 +1,243 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 03
+**CH03D Distributions of body height and income**
+
+height-income-distributions  dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from scipy.stats import norm
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/height-income-distributions/clean/"
+data_out = dirname + "da_case_studies/ch03-distributions-height-income/"
+output = dirname + "da_case_studies/ch03-distributions-height-income/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+#### Load in clean and tidy data and create workfile
+
+```{python}
+hrs = pd.read_csv(data_in + "hrs_height_income.csv")
+```
+
+```{python}
+hrs.head()
+```
+
+```{python}
+hrs.dtypes
+```
+
+```{python}
+hrs["height"] = hrs["height"].apply(pd.to_numeric, errors="coerce")  # Convert the 'height' column to numbers. If any value cannot be converted (e.g., it's text), replace it with 'NaN' (Not a Number).
+```
+
+
+```{python}
+# filtered_women = hrs.loc[
+#     (hrs["age"] >= 55)
+#     & (hrs["age"] < 60)
+#     & (hrs["female"] == 1)
+#     & (hrs["height"] > 1.3)
+#     & (hrs["height"] < 2.1)
+# ]
+```
+
+```{python}
+filtered_women = (
+    hrs
+    # Look how clean this string is!
+    # Pandas interprets "55 <= age < 60" natively.
+    .query("55 <= age < 60 and female == 1 and 1.3 < height < 2.1")
+)
+```
+
+```{python}
+filtered_women.head()
+```
+
+```{python}
+hrs.height.describe()
+```
+
+#### Distribution of Height
+
+```{python}
+# Statistics for density plot
+mean = np.mean(filtered_women["height"])
+std_dev = np.std(filtered_women["height"])
+x_vals = np.linspace(min(filtered_women["height"]), max(filtered_women["height"]), 100)
+x_vals
+```
+
+```{python}
+# # 1. CALCULATE
+# # We use .agg() to run multiple functions at once.
+# # This returns a clean Series with your stats.
+# height_stats = filtered_women["height"].agg(["mean", "std", "min", "max"])
+
+# # 2. THE RESULT
+# # height_stats['mean'] gives you the mean, etc.
+# height_stats
+```
+
+```{python}
+# Plot the histogram of the height data
+sns.histplot(
+    filtered_women["height"],
+    bins=23, # Number of bins
+    binrange=(1.345,1.92), # Range of the bins
+    stat='density',  # Normalize such that the total area of the histogram equals 1
+    color=da.color[0], # Set the color of the bars
+    fill=True, # Fill the bars with color
+    edgecolor='white',  # Set the color of the edges of the bars
+    alpha=1, # Set the transparency of the bars
+    element="bars", # Draw bars
+)
+
+# Plot the PDF of the normal distribution
+plt.plot(x_vals, norm.pdf(x_vals, mean, std_dev), color=da.color[1])
+
+# Set the y-axis ticks
+plt.yticks(ticks=np.arange(0, 6.1, 2))
+
+# Set the x-axis ticks
+plt.xticks(ticks=np.arange(1.4, 1.95, 0.1))
+
+# Set the x-axis label
+plt.xlabel("Height (meters)")
+
+# Set the y-axis label
+plt.ylabel("Density")
+
+#
+```
+
+##### LOGNORMAL: family income of women age 55-59 
+
+```{python}
+# filter dataset
+filtered_women_income = hrs.loc[
+    (hrs["age"] >= 55)
+    & (hrs["age"] < 60)
+    & (hrs["female"] == 1)
+    & (hrs["hhincome"] > 1)
+    & (hrs["hhincome"] < 1000)
+]
+filtered_women_income.head()
+```
+
+```{python}
+filtered_women_income = (
+    hrs.query("55 <= age < 60 and female == 1 and 1 < hhincome < 1000")
+)
+filtered_women_income.head()
+```
+
+```{python}
+filtered_women_income["hhincome"].describe()
+```
+
+```{python}
+sns.histplot(
+    filtered_women_income['hhincome'],
+    binwidth=20,  
+    binrange=(0,1000),
+    color=da.color[0],
+    fill=True,
+    edgecolor='white', 
+    alpha=0.95,
+    stat="probability", 
+    element="bars"
+)
+
+
+plt.xlabel("Household income (thousand USD)")
+plt.ylabel("Percent")
+plt.xlim(0, 1000)  
+plt.xticks(np.arange(0, 1001, 100))  
+plt.ylim(0, 0.31)  
+plt.yticks(np.arange(0, 0.31, 0.05), labels=[f'{int(t*100)}%' for t in np.arange(0, 0.31, 0.05)]) 
+plt.grid(True)
+plt.figure(figsize=(10, 6))
+plt.show()
+```
+
+```{python}
+# ln income
+filtered_women_income["lnincome"] = np.log(filtered_women_income["hhincome"])
+```
+
+```{python}
+mean = np.mean(filtered_women_income["lnincome"])
+std_dev = np.std(filtered_women_income["lnincome"])
+x_vals = np.linspace(min(filtered_women_income["lnincome"]), max(filtered_women_income["lnincome"]), 100)
+```
+
+```{python}
+sns.histplot(
+    filtered_women_income["lnincome"],
+    binwidth=0.25,
+    binrange=(0,8),
+    stat='density',
+    color=da.color[0],
+    fill=True,
+    edgecolor='white',
+    alpha=1,
+    #kde=False,
+)
+
+
+plt.plot(x_vals, norm.pdf(x_vals, mean, std_dev), color=da.color[1])
+plt.xlabel("ln(household income, thousand USD)")
+plt.ylabel("Density")
+plt.xlim(0, 8.1)
+plt.xticks(np.arange(0, 8.2, 1))
+plt.ylim(0, 0.4)
+plt.yticks(np.arange(0, 0.41, 0.1))
+plt.margins(x=0.01, y=0.01)
+plt.show()
+```
+
+

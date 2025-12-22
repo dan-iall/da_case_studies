@@ -1,0 +1,280 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 19
+**CH19A Food and health**
+
+using the food-health dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import pandas as pd
+import numpy as np
+import pyfixest as pf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/food-health/clean/"
+data_out = dirname + "da_case_studies/ch19-food-health"
+output = dirname + "da_case_studies/ch19-food-health/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+___
+
+```{python}
+# !!! make sure you have run ch19-food-health.ipynb before
+data = pd.read_csv(data_in + "food-health.csv")
+```
+
+```{python}
+data
+```
+
+```{python}
+workfile = data.query("age>=30&age<60")
+```
+
+```{python}
+# new variables: 
+  ## Fruit and vegetables per day (grams)
+  ## Blood pressure (systolic+diastolic)
+```
+
+```{python}
+workfile = workfile.rename(columns={"veggies_n_fruits_gr":"fv","blood_pressure":"bp"})
+```
+
+```{python}
+workfile["fv"].describe()
+```
+
+```{python}
+workfile["bp"].describe()
+```
+
+```{python}
+workfile = (
+    workfile.loc[workfile["fv"] < 3200].dropna(subset=["bp"]).reset_index(drop=True)
+)
+```
+
+```{python}
+# Days per week exercising
+workfile["exerc"] = None
+workfile.loc[workfile["paq655"] <= 7, "exerc"] = workfile["paq655"]
+workfile.loc[workfile["paq650"] == 2, "exerc"] = 0
+workfile["exerc"] = pd.to_numeric(workfile["exerc"])
+```
+
+```{python}
+# Potato chips per day, grams
+workfile = workfile.rename(columns={"gr_potato_chips": "pchips"})
+```
+
+```{python}
+workfile = workfile.rename(columns={"gr_potato_chips": "pchips"})
+```
+
+### Descriptive table
+
+```{python}
+(
+    workfile[["bp", "fv"]]
+    .describe()
+    .rename(
+        columns={
+            "bp": "Blood pressure (systolic+diastolic)",
+            "fv": "Fruit and vegetables per day (grams)",
+        }
+    )
+    .T.rename(
+        columns={
+            "50%": "Median",
+            "mean": "Mean",
+            "count": "Observations",
+            "max": "Maximum",
+            "min": "Minimum",
+            "std": "Std.Dev.",
+        }
+    )
+    .round()
+    .astype(int)
+    .filter(["Mean", "Median", "Std.Dev.", "Minimum", "Maximum", "Observations"])
+)
+```
+
+### SCATTERPLOT AND REGRESSION LINE 
+
+```{python}
+# Blood pressure vs amount of fruit and vegetables
+reg = pf.feols("bp ~ fv", data=workfile)
+reg.summary()
+```
+
+```{python}
+# scatterplot and regression line
+sns.scatterplot(data=workfile, x="fv", y="bp", s=10, alpha=0.5)
+sns.regplot(
+    data=workfile,
+    x="fv",
+    y="bp",
+    scatter=False,
+    line_kws={"color": da.color[1]},
+    ci=None,
+)
+plt.xlabel("Fruit and vegetables per day (grams)")
+plt.ylabel("Blood pressure (systolic+diastolic)")
+plt.xlim(0, 3000)
+plt.ylim(140, 280)
+plt.xticks(da.seq(0, 3000, 500))
+plt.yticks(da.seq(140, 280, 10))
+plt.show()
+```
+
+```{python}
+# regression line only
+sns.regplot(
+    data=workfile,
+    x="fv",
+    y="bp",
+    scatter=False,
+    line_kws={"color": da.color[1]},
+    ci=None,
+)
+plt.xlabel("Fruit and vegetables per day (grams)")
+plt.ylabel("Blood pressure (systolic+diastolic)")
+plt.xlim(0, 3000)
+plt.ylim(180, 200)
+plt.xticks(da.seq(0, 3000, 500))
+plt.yticks(da.seq(180, 200, 2))
+plt.show()
+```
+
+#### Log household income per capita vs fruit and vegetables per day,grams
+
+```{python}
+# gen Log household income per capita
+workfile["lninc"] = np.log(workfile["hh_income_percap"])
+```
+
+```{python}
+# gen Log household income per capita
+fig, ax = plt.subplots()
+sns.scatterplot(data=workfile, x="lninc", y="fv", s=10, alpha=0.5)
+sns.regplot(
+    data=workfile,
+    x="lninc",
+    y="fv",
+    scatter=False,
+    line_kws={"color": da.color[1]},
+    ci=None,
+)
+plt.xlabel("ln(household income per capita, US dollars)")
+plt.ylabel("Fruit and vegetables per day (grams)")
+plt.xlim(6, 12)
+plt.ylim(0, 2000)
+plt.yticks(da.seq(0, 2000, 500))
+da.add_margin(ax, x=0.01, y=0.01)
+plt.show()
+```
+
+```{python}
+# Amount of fruit and vegetables per day, g (fv) vs Days per week vigorous recreational activities (exerc)
+workfile.groupby("exerc").agg(tab_exerc=("year", "count"))
+```
+
+```{python}
+# potato chips (potato_chips) and amount of fruit and vegetables per day (fv)
+fig, ax = plt.subplots()
+sns.scatterplot(
+    data=workfile.dropna(subset=["exerc"]), x="exerc", y="fv", s=10, alpha=0.5
+)
+sns.regplot(
+    data=workfile,
+    x="exerc",
+    y="fv",
+    scatter=False,
+    line_kws={"color": da.color[1]},
+    ci=None,
+)
+plt.xlabel("Days per week exercising")
+plt.ylabel("Fruit and vegetables per day (grams)")
+plt.xlim(0, 7)
+plt.ylim(0, 2000)
+plt.yticks(da.seq(0, 2000, 500))
+da.add_margin(ax, x=0.01, y=0)
+plt.show()
+```
+
+```{python}
+fig, ax = plt.subplots()
+sns.scatterplot(data=workfile, x="pchips", y="fv", s=10, alpha=0.5)
+sns.regplot(
+    data=workfile,
+    x="pchips",
+    y="fv",
+    scatter=False,
+    line_kws={"color": da.color[1]},
+    ci=None,
+)
+plt.xlabel("Potato chips per day (grams)")
+plt.ylabel("Fruit and vegetables per day (grams)")
+plt.xlim(0, 400)
+plt.xticks(da.seq(0, 400, 50))
+plt.ylim(0, 3000)
+plt.yticks(da.seq(0, 3000, 500))
+da.add_margin(ax, x=0.02, y=0.02)
+plt.show()
+```
+
+```{python}
+reg1 = pf.feols("bp ~ fv", data=workfile, vcov="HC1")
+reg2 = pf.feols("fv ~ lninc", data=workfile, vcov="HC1")
+reg3 = pf.feols("fv ~ exerc", data=workfile, vcov="HC1")
+reg4 = pf.feols("fv ~ pchips", data=workfile, vcov="HC1")
+```
+
+```{python}
+pf.etable([reg1, reg2, reg3, reg4])
+```
+
+

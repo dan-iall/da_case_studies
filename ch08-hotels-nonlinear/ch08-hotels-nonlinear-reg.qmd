@@ -1,0 +1,232 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 08
+**CH08A Finding a good deal among hotels with nonlinear function**
+
+using the hotels-vienna dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import statsmodels.formula.api as smf
+from stargazer.stargazer import Stargazer
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/hotels-vienna/clean/"
+data_out = dirname + "da_case_studies/ch08-hotels-measurement-error/"
+output = dirname + "da_case_studies/ch08-hotels-measurement-error/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# load vienna
+hotels = pd.read_csv(data_in + "hotels-vienna.csv")
+#data = pd.read_csv("https://osf.io/y6jvb/download")
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Constructing the Analytical Sample
+**The Syntax Anatomy:**
+* `hotels.loc[...]` (**Selector**) $\to$ Filters rows based on the boolean mask.
+* `(cond1) & (cond2)`: **Bitwise AND**. All conditions must be True.
+* `notna()`: Explicitly removes missing values (crucial for regression samples).
+
+**Data Flow:** `(All Hotels)` $\to$ `(Vienna 3-4 Star Hotels < €600)`
+**Student Note:** Notice the `price <= 600` cutoff. This is likely "Winsorization" or outlier removal based on domain knowledge to prevent a few luxury suites from skewing the regression coefficients.
+
+```{python}
+hotels = hotels.loc[
+    (hotels["accommodation_type"] == "Hotel")
+    & (hotels["city_actual"] == "Vienna")
+    & (hotels["stars"] >= 3)
+    & (hotels["stars"] <= 4)
+    & (hotels["stars"].notna())
+    & (hotels["price"] <= 600)
+]
+```
+
+#### LOG MODELS
+
+```{python}
+hotels['lnprice'] = np.log(hotels['price'])
+hotels['distance2'] = hotels['distance']
+hotels.loc[hotels['distance2'] < 0.05, 'distance2'] = 0.05 #lets not have exact 0 distance!
+hotels['lndistance'] = np.log(hotels['distance2'])
+```
+
+```{python}
+hotels["price"].describe()
+```
+
+```{python}
+hotels["lnprice"].describe()
+```
+
+## Regression
+
+```{python}
+reg1 = smf.ols("price ~ distance", data=hotels).fit()
+reg1.summary()
+```
+
+```{python}
+reg2 = smf.ols("price ~ lndistance", data=hotels).fit()
+reg2.summary()
+```
+
+```{python}
+reg3 = smf.ols("lnprice ~ distance", data=hotels).fit()
+reg3.summary()
+```
+
+```{python}
+reg4 = smf.ols("lnprice ~ lndistance", data=hotels).fit()
+reg4.summary()
+# reg4.summary(slim = True)
+```
+
+### Figure 8.1 Regressions of hotel price and distance to the city center
+
+```{python}
+sns.regplot(
+    data=hotels,
+    x="distance",
+    y="price",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 7.1, 1))
+plt.ylim(-10, 410)
+plt.yticks(np.arange(0, 410, 50))
+
+
+plt.show()
+```
+
+```{python}
+sns.regplot(
+    data=hotels,
+    x="distance",
+    y="lnprice",
+    ci=True,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+
+plt.xlabel("Distance to city center (miles)", fontsize=12)
+plt.ylabel("ln(price, US dollars)", fontsize=12)
+plt.xlim(-0.1, 7.1)
+plt.xticks(np.arange(0, 7.1, 1))
+plt.ylim(3.45, 6.05)
+plt.yticks(np.arange(3.5, 6.1, 0.5))
+
+
+plt.show()
+```
+
+### Figure 8.2 Regressions of hotel price and distance to the city center
+
+```{python}
+sns.regplot(
+    data=hotels,
+    x="lndistance",
+    y="price",
+    ci=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=20),
+)
+
+plt.xlabel("ln(distance to city center, miles)", fontsize=12)
+plt.ylabel("Price (US dollars)", fontsize=12)
+plt.xlim(-3.3, 2.1)
+plt.xticks(np.arange(-3, 2.1, 1))
+plt.ylim(-10, 410)
+plt.yticks(np.arange(0, 410, 50))
+
+
+plt.show()
+```
+
+```{python}
+sns.regplot(data=hotels, x="lndistance", y="lnprice",ci = False,line_kws=dict(color=da.color[1]),scatter_kws=dict(alpha = 1,s = 20))
+
+plt.xlabel("ln(distance to city center, miles)", fontsize=12)
+plt.ylabel("ln(price, US dollars)", fontsize=12)
+plt.xlim(-3.3, 2.1)
+plt.xticks(np.arange(-3, 2.1, 1))  
+plt.ylim(3.45, 6.05)
+plt.yticks(np.arange(3.5, 6.1, 0.5))  
+
+
+plt.show()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Regression Table Generation
+**The Syntax Anatomy:**
+* `Stargazer([...])`: **Aggregator**. Collects model objects.
+* `.covariate_order(...)`: **Sorter**. Forces specific variables to the top (usually the variable of interest, then controls).
+* `.custom_columns(...)`: **Labeler**. Adds the "Dependent Variable" header row.
+
+**Data Flow:** `(4 Regression Objects)` $\to$ `(1 Formatted HTML Table)`
+**Student Note:** Be careful interpreting the "Constant" across these models. In a Log-Log model, the constant has no direct economic interpretation without transformation.
+
+```{python}
+stargazer = Stargazer([reg1, reg3, reg2, reg4])
+stargazer.covariate_order(["distance", "lndistance", "Intercept"])
+stargazer.custom_columns(["price", "ln(price)", "price", "ln(price)"], [1, 1, 1, 1])
+stargazer.rename_covariates(
+    {
+        "Intercept": "Constant",
+        "distance": "Distance to city center, miles",
+        "lndistance": "ln(distance to city center)",
+    }
+)
+stargazer
+```
+
+

@@ -1,0 +1,189 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 10
+**CH10B Finding a good deal among hotels with multiple regression**
+
+using the hotels-vienna dataset
+
+version 1.0 2021-05-05
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+current_path = os.getcwd()
+base_dir = current_path.split("da_case_studies")[0]
+data_in = os.path.join(str(base_dir) , "da_data_repo/hotels-vienna/clean/")
+data_out = os.path.join(str(base_dir), "da_case_studies/ch10-hotels-multiple-reg/")
+func = os.path.join(str(base_dir) ,   "da_case_studies/ch00-tech-prep/")
+sys.path.append(func)
+```
+
+```{python}
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+hotels = pd.read_csv(os.path.join(data_in, "hotels-vienna.csv"))
+# hotels = pd.read_csv("https://osf.io/y6jvb/download")
+```
+
+```{python}
+hotels = hotels.loc[
+    lambda x: (x["accommodation_type"] == "Hotel")
+    & (x["city_actual"] == "Vienna")
+    & (x["stars"] >= 3)
+    & (x["stars"] <= 4)
+    & (x["price"] <= 600)
+    & (x["stars"].notnull())
+]
+```
+
+```{python}
+len(hotels)
+```
+
+```{python}
+hotels["lnprice"] = np.log(hotels["price"])
+hotels["distance2"] = hotels["distance"]
+hotels.loc[hotels["distance2"] < 0.05, "distance2"] = 0.05
+hotels["lndistance"] = np.log(hotels["distance2"])
+hotels["star35"] = hotels["stars"] == 3.5
+hotels["star4"] = hotels["stars"] == 4
+```
+
+```{python}
+hotels[["distance", "price", "lnprice"]].describe()
+```
+
+```{python}
+reg0 = pf.feols("lnprice ~ rating", data=hotels)
+reg1 = pf.feols("lnprice ~ distance", data=hotels)
+reg2 = pf.feols("lnprice ~ distance + rating", data=hotels)
+```
+
+```{python}
+pf.etable([reg0,reg1,reg2])
+```
+
+```{python}
+reg3 = pf.feols(
+    "lnprice ~ da.lspline(distance,[1,4]) + da.lspline(rating, [3.5]) + star35 + star4",
+    data=hotels,
+    context=0,
+)
+```
+
+```{python}
+pf.etable(reg3)
+```
+
+```{python}
+hotels["lnprice_hat"] = reg3.predict()
+hotels["lnprice_resid"] = hotels["lnprice"] - hotels["lnprice_hat"]
+
+hotels["bestdeals"] = hotels.index.isin(
+    hotels["lnprice_resid"].sort_values(ascending=False).tail().index.values
+)
+hotels["lnprice_hat"]
+hotels.loc[hotels["bestdeals"]][["price","lnprice_resid","distance","stars","rating"]]
+```
+
+```{python}
+reg4 = pf.feols("lnprice ~ da.lspline(distance,[1,4])", data=hotels,context=0)
+```
+
+```{python}
+pf.etable([reg1, reg2, reg3, reg4])
+```
+
+### Figure 10.3 ˆy−y plot for log hotel price
+
+```{python}
+plt.xlim(3.8, 6.1)
+sns.regplot(
+    data=hotels,
+    x="lnprice_hat",
+    y="lnprice",
+    ci=False,
+    truncate=False,
+    line_kws=dict(color=da.color[1], linestyle="dashed"),
+    scatter_kws=dict(alpha=1, s=10),
+)
+
+sns.scatterplot(
+    hotels.loc[hotels["bestdeals"] == True],
+    x="lnprice_hat",
+    y="lnprice",
+    color="black",
+    s=15,
+    zorder=3,
+)
+
+plt.xlabel("predicted ln(price, US dollars)", fontsize=12)
+plt.ylabel("ln(price, US dollars)", fontsize=12)
+plt.xticks(np.arange(4, 6.1, 0.5))
+plt.ylim(3.8, 6.1)
+plt.yticks(np.arange(4, 6.1, 0.5))
+plt.annotate(
+    "Best deal",
+    xy=(4.7, 4.1),
+    xytext=(4.9, 4),
+    arrowprops=dict(color="black", arrowstyle="->"),
+    fontsize=11.5,
+)
+plt.show()
+```
+
+### Residual plot - not in the book
+
+```{python}
+plt.xlim(4, 5.5)
+sns.regplot(
+    data=hotels,
+    x="lnprice_hat",
+    y="lnprice_resid",
+    ci=False,
+    truncate=False,
+    line_kws=dict(color=da.color[1]),
+    scatter_kws=dict(alpha=1, s=10),
+)
+
+
+plt.xlabel("predicted ln(price, US dollars)", fontsize=12)
+plt.ylabel("Residuals", fontsize=12)
+
+plt.xticks(np.arange(4.5, 5.1, 0.5))
+plt.ylim(-0.7, 1.7)
+plt.yticks(np.arange(-0.5, 1.51, 0.5))
+plt.show()
+```
+
+

@@ -1,0 +1,413 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 16
+**CH16A Predicting apartment prices with random forest**
+
+using the airbnb dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import re
+import sys
+import warnings
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/airbnb/clean/"
+data_out = dirname + "da_case_studies/ch16-airbnb-random-forest/"
+output = dirname + "da_case_studies/ch16-airbnb-random-forest/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+import py_helper_functions as da
+```
+
+-------------------------------------------------------
+### Import data
+
+```{python}
+area = "london"
+data = pd.read_csv(data_in + "airbnb_" + area + "_cleaned_book.csv", index_col=0)
+#data = pd.read_csv("https://osf.io/download/7n96w/", index_col=0)
+```
+
+```{python}
+data["property_type"].value_counts()
+```
+
+```{python}
+# keep if property type is Apartment, House or Townhouse
+data = data.loc[lambda x: x["property_type"].isin(["Apartment", "House", "Townhouse"])]
+```
+
+```{python}
+# rename Townhouse to House
+# f_ = Factor (Categorical variable)
+
+data["property_type"] = np.where(
+    data["property_type"] == "Townhouse", "House", data["property_type"]
+)
+data["f_property_type"] = data["property_type"].astype("category")
+```
+
+```{python}
+data["room_type"].value_counts()
+```
+
+```{python}
+# Room type as factor
+
+data["f_room_type"] = data["room_type"].astype("category")
+```
+
+```{python}
+# Rename roomt type because it is too long
+data["f_room_type2"] = data["f_room_type"].map(
+    {
+        "Entire home/apt": "Entire/Apt",
+        "Private room": "Private",
+        "Shared room": "Shared",
+    }
+)
+```
+
+```{python}
+# cancellation policy as factor
+data["cancellation_policy"].value_counts()
+```
+
+```{python}
+# if cancellation policy is super strict 30 or 60, rename it as strict
+data["cancellation_policy"] = np.where(
+    (data["cancellation_policy"] == "super_strict_30")
+    | (data["cancellation_policy"] == "super_strict_60"),
+    "strict",
+    data["cancellation_policy"],
+)
+data["f_cancellation_policy"] = data["cancellation_policy"].astype("category")
+```
+
+```{python}
+# bed_type and neighbourhood_cleansed as factors
+
+data["bed_type"] = np.where(
+    data["bed_type"].isin(["Futon", "Pull-out Sofa", "Airbed"]),
+    "Couch",
+    data["bed_type"],
+)
+
+data["f_bed_type"] = data["bed_type"].astype("category")
+data["f_neighbourhood_cleansed"] = data["neighbourhood_cleansed"].astype("category")
+```
+
+---------
+
+### Create Numerical variables
+
+```{python}
+data["usd_price_day"] = data["price"]
+data["p_host_response_rate"] = data["host_response_rate"].fillna(0).astype(int)
+# rename cleaning_fee column
+
+data = data.rename(columns={"cleaning_fee": "usd_cleaning_fee"})
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Type Enforcement & Sanitization
+**The Syntax Anatomy:**
+* `data[col]` (**Dirty Series**) $\to$ `pd.to_numeric(...)` (**The Sanitizer**)
+* `errors="coerce"`: **CRITICAL.** If value cannot be parsed, replace with `NaN`. Do not raise error.
+
+**Data Flow:** `(N_rows, Mixed_Type)` $\to$ `(N_rows, Float64)`
+**Student Note:** The prefix `n_` marks these as "safe" for the Random Forest. Any generated `NaN`s must be handled (imputed) before modeling.
+
+```{python}
+# add new numeric columns from certain columns
+# n_ = Numeric
+
+numericals = [
+    "accommodates",
+    "bathrooms",
+    "review_scores_rating",
+    "number_of_reviews",
+    "guests_included",
+    "reviews_per_month",
+    "extra_people",
+    "minimum_nights",
+    "beds",
+]
+
+for col in numericals:
+    data["n_" + col] = pd.to_numeric(data[col], errors="coerce")
+
+# # Vectorized approach using apply
+# data[["n_" + col for col in numericals]] = data[numericals].apply(pd.to_numeric, errors="coerce")
+
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+# # create days since first review
+
+# data["n_days_since"] = (
+#     data.calendar_last_scraped.apply(lambda x: datetime.strptime(x, "%Y-%m-%d"))
+#     - data.first_review.fillna("1950-01-01").apply(
+#         lambda x: datetime.strptime(x, "%Y-%m-%d")
+#     )
+# ).dt.days
+
+# data["n_days_since"] = np.where(data.first_review.isnull(), np.nan, data.n_days_since)
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Feature Engineering (Tenure)
+**The Syntax Anatomy:**
+* `pd.to_datetime(Col_A)` - `pd.to_datetime(Col_B)` (**Vectorized Ops**) $\to$ `TimeDelta`
+* `.dt.days`: Extracts the scalar "Days" from the duration.
+
+**Data Flow:** `(N, String) - (N, String)` $\to$ `(N, Float64)`
+**Student Note:** Returns Float64 because `NaN` values (missing reviews) prevent integer storage.
+
+```{python}
+# Bellonda's Vectorized Alternative
+# No loops, no "1950" hacks, no np.where fixing.
+data["n_days_since"] = (
+    pd.to_datetime(data["calendar_last_scraped"], format="%Y-%m-%d")
+    - pd.to_datetime(data["first_review"], format="%Y-%m-%d", errors="coerce")
+).dt.days
+```
+
+```{python}
+f"Percentage of missing values in 'n_days_since': {data['n_days_since'].isna().sum() / len(data) * 100:.2f}%"
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Namespace Standardization
+**The Syntax Anatomy:**
+* `data.columns[X:Y]` (**Positional Slicing**) $\to$ `dummies`
+* `re.sub` (**Regex Sanitization**) $\to$ Removes ` ` , `/`, `-`.
+
+**Data Flow:** `(N, 50)` $\to$ `(N, 100)` (Duplicates columns with new names)
+**Student Note:** Creating copies doubles memory usage for these columns. Renaming is usually preferred.
+
+```{python}
+# create dummy vars
+dummies = data.columns[71:121]
+
+for col in dummies:
+    data["d_" + (re.sub("/|\s|-", "", col)).replace("(s)", "s").lower()] = data[col]
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Feature Subsetting
+**The Syntax Anatomy:**
+* `regex="^d_.*..."` (**Pattern Match**) $\to$ Auto-selects engineering features.
+* `pd.concat(..., axis=1)` (**Column Bind**) $\to$ Merges features + admin IDs.
+
+**Data Flow:** `(N, Many_Cols)` $\to$ `(N, Curated_Cols)`
+**Student Note:** This step effectively "Cleans" the workspace by dropping all intermediate variables not matching the naming convention.
+
+```{python}
+# keep columns if contain d_, n_,f_, p_, usd_ and some others
+
+data = pd.concat(
+    [
+        data.filter(
+            regex="^d_.*|^n_.*|^f_.*|^p_.*|^usd_.*",
+        ),
+        data[
+            [
+                "price",
+                "id",
+                "neighbourhood_cleansed",
+                "cancellation_policy",
+                "room_type",
+                "property_type",
+            ]
+        ],
+    ],
+    axis=1,
+)
+```
+
+```{python}
+#####################
+### look at price ###
+#####################
+
+data["price"] = data["price"].str.replace(",", "").astype(float)
+
+data = data.loc[lambda x: x.price < 1000]
+```
+
+```{python}
+# Squares and further values to create
+data = data.assign(
+    n_accommodates2=lambda x: x["n_accommodates"] ** 2,
+    ln_accommodates=lambda x: np.log(x["n_accommodates"]),
+    ln_accommodates2=lambda x: np.log(x["n_accommodates"]) ** 2,
+    ln_beds=lambda x: np.log(x["n_beds"]),
+    ln_number_of_reviews=lambda x: np.log(x["n_number_of_reviews"] + 1),
+)
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Variable Binning (Discretization)
+**The Syntax Anatomy:**
+* `Variable` + `[(Start, End), ...]` (**Bin Definitions**) $\to$ `Category Label`
+
+**Data Flow:** `(N, Float)` $\to$ `(N, Categorical Int)`
+**Student Note:** Categorizing prevents the model from interpolating. It treats "1 bathroom" and "2 bathrooms" as distinct entities with potentially totally different price behaviors.
+
+```{python}
+# Pool accomodations with 0,1,2,10 bathrooms
+
+data["f_bathroom"] = da.pool_and_categorize_continuous_variable(
+    data["n_bathrooms"], [(0, 1), (1, 2), (2, 10)], [0, 1, 2]
+)
+
+data["f_bathroom"].value_counts(dropna=False)
+```
+
+```{python}
+# Pool num of reviews to 3 categories: none, 1-51 and >51
+
+data["f_number_of_reviews"] = da.pool_and_categorize_continuous_variable(
+    data["n_number_of_reviews"],
+    [(0, 1), (1, 51), (51, data["n_number_of_reviews"].max())],
+    [0, 1, 2],
+)
+data["f_number_of_reviews"].value_counts(dropna=False)
+```
+
+```{python}
+# Pool and categorize the number of minimum nights: 1,2,3, 3+
+
+data["f_minimum_nights"] = da.pool_and_categorize_continuous_variable(
+    data["n_minimum_nights"], [(1, 2), (2, 3), (3, data["n_minimum_nights"].max())], [1, 2, 3]
+)
+data["f_minimum_nights"].value_counts(dropna=False)
+```
+
+```{python}
+# Change Infinite values with NaNs
+data = data.replace([np.inf, -np.inf], np.nan)
+```
+
+```{python}
+# ------------------------------------------------------------------------------------------------
+# where do we have missing variables now?
+to_filter = data.isna().sum()
+to_filter[to_filter > 0]
+```
+
+```{python}
+# what to do with missing values?
+# 1. drop if no target
+data = data.loc[lambda x: x.price.notnull()]
+```
+
+```{python}
+# 2. imput when few, not that important
+data = data.assign(
+    n_bathrooms=lambda x: x["n_bathrooms"].fillna(np.median(x["n_bathrooms"].dropna())),
+    n_beds=lambda x: np.where(x["n_beds"].isnull(), x["n_accommodates"], x["n_beds"]),
+    f_bathroom=lambda x: x["f_bathroom"].fillna(1),
+    f_minimum_nights=lambda x: x["f_minimum_nights"].fillna(1),
+    f_number_of_reviews=lambda x: x["f_number_of_reviews"].fillna(1),
+    ln_beds=lambda x: x["ln_beds"].fillna(0),
+)
+```
+
+```{python}
+# 3. drop columns when many missing not important
+data = data.drop(["usd_cleaning_fee", "p_host_response_rate"], axis=1)
+```
+
+```{python}
+to_filter = data.isna().sum()
+to_filter[to_filter > 0]
+```
+
+```{python}
+# 4. Replace missing variables re reviews with zero, when no review + add flags
+data = data.assign(
+    flag_days_since=np.multiply(data.n_days_since.isna(), 1),
+    n_days_since=data.n_days_since.fillna(np.median(data.n_days_since.dropna())),
+    flag_review_scores_rating=np.multiply(data.n_review_scores_rating.isna(), 1),
+    n_review_scores_rating=data.n_review_scores_rating.fillna(
+        np.median(data.n_review_scores_rating.dropna())
+    ),
+    flag_reviews_per_month=np.multiply(data.n_reviews_per_month.isna(), 1),
+    n_reviews_per_month=data.n_reviews_per_month.fillna(
+        np.median(data.n_reviews_per_month.dropna())
+    ),
+    flag_n_number_of_reviews=np.multiply(data.n_number_of_reviews.isna(), 1),
+)
+```
+
+```{python}
+data.flag_days_since.value_counts()
+```
+
+```{python}
+# redo features
+# Create variables, measuring the time since: squared, cubic, logs
+data = data.assign(
+    ln_days_since=lambda x: np.log(x["n_days_since"] + 1),
+    ln_days_since2=lambda x: np.log(x["n_days_since"] + 1) ** 2,
+    ln_days_since3=lambda x: np.log(x["n_days_since"] + 1) ** 3,
+    n_days_since2=lambda x: x["n_days_since"] ** 2,
+    n_days_since3=lambda x: x["n_days_since"] ** 3,
+    ln_review_scores_rating=lambda x: np.log(x["n_review_scores_rating"]),
+)
+```
+
+```{python}
+data.ln_days_since = data["ln_days_since"].fillna(0)
+data.ln_days_since2 = data["ln_days_since2"].fillna(0)
+data.ln_days_since3 = data["ln_days_since3"].fillna(0)
+```
+
+```{python}
+to_filter = data.isna().sum()
+to_filter[to_filter > 0]
+```
+
+```{python}
+data.describe()
+```
+
+```{python}
+data.to_csv(data_out + "airbnb_london_workfile_adj.csv", index=False)
+```
+
+

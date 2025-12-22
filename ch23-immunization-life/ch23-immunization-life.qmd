@@ -1,0 +1,358 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 23
+**CH23B Immunization against measles and saving children using the worldbank-immunization dataset**
+
+using the airbnb dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/worldbank-immunization/clean/"
+data_out = dirname + "da_case_studies/ch23-immunization-life/"
+output = dirname + "da_case_studies/ch23-immunization-life/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# Import data
+
+data = pd.read_csv(data_in + "worldbank-immunization-continents.csv")
+# data = pd.read_csv("https://osf.io/58zrj/download")
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(7, 5.5))
+
+# Plot the main lines
+sns.lineplot(data=data, x="year", y="imm_SAS", linewidth=3, ax=ax)
+sns.lineplot(data=data, x="year", y="imm_SSF", linewidth=3, ax=ax)
+
+# Plot the additional grey lines
+for col in data.columns[1:6]:
+    sns.lineplot(data=data, x="year", y=col, color="lightgrey", linewidth=2, ax=ax)
+
+# Annotate the specific points
+ax.text(2006, 78, "South Asia", fontsize=12)
+ax.text(2011, 66, "sub-Saharan Africa", fontsize=12)
+# Customize the labels and ticks
+ax.set_xlabel("Date (year)")
+ax.set_ylabel("Immunization rate (percent)")
+ax.set_xticks(np.arange(1998, 2019, 5))
+ax.set_yticks(np.arange(50, 101, 10))
+ax.set_ylim(50, 100)
+ax.set_xlim(1998, 2018)
+
+# Show the plot
+da.add_margin(ax, x=0.01, y=0)
+plt.show()
+```
+
+```{python}
+data[
+    ["surv_EAS", "surv_ECS", "surv_LCN", "surv_MEA", "surv_NAC", "surv_SAS", "surv_SSF"]
+] = (
+    data[
+        [
+            "surv_EAS",
+            "surv_ECS",
+            "surv_LCN",
+            "surv_MEA",
+            "surv_NAC",
+            "surv_SAS",
+            "surv_SSF",
+        ]
+    ]
+    / 10
+)
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(7, 5.5))
+
+# Plot the main lines
+sns.lineplot(data=data, x="year", y="surv_SAS", linewidth=3, ax=ax)
+sns.lineplot(data=data, x="year", y="surv_SSF", linewidth=3, ax=ax)
+
+# Add additional lines for columns 8 to 13
+for col in data.columns[8:13]:
+    sns.lineplot(data=data, x="year", y=col, color="lightgrey", linewidth=2, ax=ax)
+
+# Add annotations
+ax.text(data.loc[12, "year"] - 4, data.loc[12, "surv_SAS"], "South Asia", fontsize=12)
+ax.text(2011, 89, "sub-Saharan Africa", fontsize=12)
+
+# Set labels and title
+ax.set_xlabel("Date (year)", fontsize=12)
+ax.set_ylabel("Child survival rate (percent)", fontsize=12)
+
+# Set axis limits and ticks
+ax.set_xlim(1998, 2018)
+ax.set_ylim(80, 100)
+ax.set_xticks(np.arange(1998, 2019, 5))
+ax.set_yticks(np.arange(80, 101, 5))
+
+da.add_margin(ax, x=0.01, y=0)
+plt.show()
+```
+
+# Regressions on countries
+
+```{python}
+data_panel = pd.read_csv(data_in + "worldbank-immunization-panel.csv")
+data_panel.describe()
+```
+
+```{python}
+data_panel = data_panel.dropna(subset=["imm", "gdppc"])
+```
+
+```{python}
+data_panel["balanced"] = data_panel["c"].isin(
+    data_panel.groupby("c")
+    .agg(
+        min_year=("year", min), max_year=("year", max), n_unique_years=("year", "count")
+    )
+    .query("(min_year == 1998)&(max_year == 2017)&(n_unique_years==20)")
+    .index
+)
+```
+
+```{python}
+data_balanced = data_panel.query("balanced == True")
+```
+
+```{python}
+countries_grouped = data_balanced.groupby("c")
+
+data_balanced["lnpop"] = countries_grouped["pop"].transform(np.log)
+data_balanced["d_surv"] = countries_grouped["surv"].transform("diff")
+data_balanced["d_imm"] = countries_grouped["imm"].transform("diff")
+data_balanced["d2_imm"] = countries_grouped["d_imm"].transform("diff")
+data_balanced["d_lngdppc"] = countries_grouped["lngdppc"].transform("diff")
+data_balanced["d_lnpop"] = countries_grouped["lnpop"].transform("diff")
+data_balanced["avgpop"] = countries_grouped["pop"].transform("mean")
+
+data_balanced = data_balanced.sort_values(by=["c", "year"])
+```
+
+## Fixed Effect
+
+```{python}
+fe_lm = pf.feols(
+    "surv ~ imm  + C(year) | c",
+    data=data_balanced,
+    vcov={"CRV1": "c"},
+    weights="avgpop",
+)
+fe_lm2 = pf.feols(
+    "surv ~ imm + lngdppc + lnpop  + C(year) | c",
+    data=data_balanced,
+    vcov={"CRV1": "c"},
+    weights="avgpop",
+)
+```
+
+### Table 23.2 The effect of measles immunization on child survival. FE regressions
+
+```{python}
+pf.etable([fe_lm, fe_lm2], drop=["year"])
+```
+
+```{python}
+# no weights, not in book
+
+fe_lm2_nowts = pf.feols(
+    "surv ~ imm + lngdppc + lnpop + C(year) | c", data=data_balanced, vcov={"CRV1": "c"}
+)
+# large difference in R2
+print(fe_lm2_nowts._r2_within)
+print(fe_lm2._r2_within)
+```
+
+### Table 23.3 Clustered SE versus biased simple SE in a FE panel regression
+
+```{python}
+fe_lm2_hetero = pf.feols(
+    "surv ~ imm + lngdppc + lnpop  + C(year) | c",
+    data=data_balanced,
+    vcov="iid",
+    weights="avgpop",
+)
+```
+
+```{python}
+pf.etable([fe_lm2, fe_lm2_hetero], keep=["imm", "lngdppc", "lnpop"])
+```
+
+## First Difference
+
+```{python}
+data_balanced = data_balanced.reset_index()
+data_balanced["year"] = data_balanced["year"].astype("category")
+```
+
+```{python}
+def lag(x: pd.Series, i: int) -> pd.Series:
+    return x.shift(i)
+```
+
+```{python}
+basic_fd_formula = "d_surv ~ d_imm"
+fd_5_lags_formula = "+".join(
+    [basic_fd_formula] + [f"lag(d_imm, {i})" for i in range(1, 6)]
+)
+```
+
+```{python}
+fd_lm = pf.feols(
+    basic_fd_formula, data=data_balanced, vcov={"CRV1": "c"}, weights="avgpop"
+)
+fd_lm_5 = pf.feols(
+    fd_5_lags_formula, data=data_balanced, vcov={"CRV1": "c"}, weights="avgpop"
+)
+pf.etable([fd_lm, fd_lm_5])
+```
+
+```{python}
+fd_lags = "+".join([f"lag(d2_imm,{i})" for i in range(0, 5)])
+fd_lags_leads = fd_lags + "+" + "+".join([f"lag(d_imm,{i})" for i in range(-3,0)])
+```
+
+```{python}
+fd_5_lags_cumul = "d_surv ~ lag(d_imm, 5) +" + fd_lags
+fd_5_lags_cumul_leads = "d_surv ~ lag(d_imm, 5) +" + fd_lags_leads
+```
+
+```{python}
+fd_lm_5_cumul = pf.feols(
+    fd_5_lags_cumul, data=data_balanced, vcov={"CRV1": "c"}, weights="avgpop"
+)
+fd_lm_5_cumul_lead = pf.feols(
+    fd_5_lags_cumul_leads, data=data_balanced, vcov={"CRV1": "c"}, weights="avgpop"
+)
+pf.etable([fd_lm_5_cumul, fd_lm_5_cumul_lead], keep="d_imm|d2_imm, -|Intercept")
+```
+
+___
+
+### AGGREG TREND, CONFOUNDERS, CTRY TRENDS
+
+```{python}
+# FD, 5 lags, cumul, aggreg trend
+
+fd_lm_5_cumul_trend_formula = fd_5_lags_cumul + " + C(year)"
+
+fd_lm_5_cumul_trend = pf.feols(
+    fd_lm_5_cumul_trend_formula, data=data_balanced, vcov={"CRV1": "c"}, weights="avgpop"
+)
+```
+
+```{python}
+# *FD, 5 lags, cumul, aggreg trend, confounders
+
+lngdppc_lags = "+".join([f"lag(d_lngdppc,{i})" for i in range(0, 6)])
+lnpop_lags = "+".join([f"lag(d_lnpop,{i})" for i in range(0, 6)])
+
+fd_lm_5_cumul_trend_c_formula = (
+    fd_5_lags_cumul + "+" + lngdppc_lags + "+" + lnpop_lags + "+ C(year)"
+)
+fd_lm_5_cumul_trend_c = pf.feols(
+    fd_lm_5_cumul_trend_c_formula,
+    data=data_balanced,
+    vcov={"CRV1": "c"},
+    weights="avgpop",
+)
+```
+
+```{python}
+# * check: cumulative coeffs on the confounders
+```
+
+```{python}
+R = (
+    fd_lm_5_cumul_trend_c.coef()
+    .reset_index()["Coefficient"]
+    .str.contains("d_lngdppc")
+    .to_numpy()
+)
+
+f_test = fd_lm_5_cumul_trend_c.wald_test(R)
+print(f_test)
+```
+
+```{python}
+R = (
+    fd_lm_5_cumul_trend_c.coef()
+    .reset_index()["Coefficient"]
+    .str.contains("d_lnpop")
+    .to_numpy()
+)
+
+f_test = fd_lm_5_cumul_trend_c.wald_test(R)
+print(f_test)
+```
+
+```{python}
+fd_lm_5_cumul_trend_c_country_formula = fd_lm_5_cumul_trend_c_formula + "| c"
+
+fd_lm_5_cumul_trend_c_country = pf.feols(
+    fd_lm_5_cumul_trend_c_country_formula,
+    data=data_balanced,
+    vcov={"CRV1": "c"},
+    weights="avgpop",
+)
+```
+
+```{python}
+pf.etable(
+    [fd_lm_5_cumul_trend, fd_lm_5_cumul_trend_c, fd_lm_5_cumul_trend_c_country],
+    keep="d_imm",
+)
+```
+
+

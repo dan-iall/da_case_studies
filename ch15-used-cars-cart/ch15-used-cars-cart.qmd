@@ -1,0 +1,655 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 15
+**CH15A Predicting used car value with regression trees**
+
+using the used-cars dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import root_mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeRegressor
+from skmisc.loess import loess
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/used-cars/clean/"
+data_out = dirname + "da_case_studies/ch15-used-cars-cart/"
+output = dirname + "da_case_studies/ch15-used-cars-cart/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# DATA IMPORT
+data = pd.read_csv(data_in + "used-cars_2cities_prep.csv")
+# data = pd.read_csv("https://osf.io/7gvz9/download")
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+# SAMPLE DESIGN
+
+# Manage missing
+data["fuel"] = data["fuel"].fillna("Missing")
+data["drive"] = data["drive"].fillna("Missing")
+data["cylinders"] = data["cylinders"].fillna("Missing")
+data["transmission"] = data["transmission"].fillna("Missing")
+data["type"] = data["type"].fillna("Missing")
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+data["condition"].value_counts()
+```
+
+```{python}
+data["condition"] = data["condition"].fillna("good")
+```
+
+```{python}
+data["condition"].value_counts()
+```
+
+```{python}
+# Drop hybrid models and the 'Hybrid' column
+data = data.loc[lambda df: df["Hybrid"] == 0].drop(columns=["Hybrid"])
+
+# Keep only gas-fueled vehicles
+data = data.loc[lambda df: df["fuel"] == "gas"]
+
+# Drop vehicles in fair and new condition
+data = data.loc[lambda df: ~df["condition"].isin(["new", "fair"])]
+
+# Drop unrealistic values for price and odometer reading
+data = data.loc[lambda df: df["price"].between(500, 25000) & (df["odometer"] <= 100)]
+
+# Drop if price is smaller than 1000 and condition is 'like new' or age is less than 8
+data = data.loc[
+    lambda df: ~(
+        (df["price"] < 1000) & ((df["condition"] == "like new") | (df["age"] < 8))
+    )
+]
+
+# Drop manual transmission
+data = data.loc[lambda df: df["transmission"] != "manual"]
+
+# Drop trucks and pickups
+data = data.loc[lambda df: ~df["type"].isin(["truck", "pickup"])]
+
+# Drop 'pricestr' column
+data = data.drop(columns=["pricestr"])
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+# to be on the safe side
+data = data[data["price"].notna()]
+data = data.reset_index(drop=True)
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+# DATA GENERATION & DESCRIPTIVES
+# CONDITION
+data["cond_excellent"] = np.where(data["condition"] == "excellent", 1, 0)
+data["cond_good"] = np.where(data["condition"] == "good", 1, 0)
+data["cond_likenew"] = np.where(data["condition"] == "like new", 1, 0)
+# cylinders
+data["cylind6"] = np.where(data["cylinders"] == "6 cylinders", 1, 0)
+data.cylinders.value_counts()
+data.cylind6.value_counts()
+# chicago
+data["chicago"] = np.where(data["area"] == "chicago", 1, 0)
+# age: quadratic, cubic
+data["agesq"] = data["age"] ** 2
+data["agecu"] = data["age"] ** 3
+# odometer quadratic
+data["odometersq"] = data["odometer"] ** 3
+data.to_csv("usedcars_work.csv", index=False)
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+data.price.describe()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: The Validation Split
+**The Syntax Anatomy:**
+* `train_test_split(...)` (**The Separator**) $\to$ Returns a `Tuple`
+* `test_size=0.3`: Defines the "Exam" difficulty (30% of data unseen).
+* `random_state=123`: **The Seed**. Ensures every student gets the exact same shuffle.
+
+**Data Flow:** `(All Cars)` $\to$ `(Training Set: 70%)` + `(Holdout/Test Set: 30%)`
+**Student Note:** NEVER change the `random_state` if you want your results to match the textbook numbers!
+
+```{python}
+
+data_train, data_test = train_test_split(data, test_size=0.3, random_state=123)
+```
+
+```{python}
+data_train.head()
+```
+
+```{python}
+data_train.info()
+```
+
+### Regression tree
+---
+
+```{python}
+data_train["price"].describe()
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: The Decision Stump (Depth=1)
+**The Syntax Anatomy:**
+* `DecisionTreeRegressor(...)` (**The Model Archetype**)
+* `max_depth=1`: "Ask only ONE question." (Creates a stump, not a full tree).
+* `data[[...]]`: **Dimensionality Promotion**. Forces a Series (1D) into a Matrix (2D).
+
+**Data Flow:** `(Age Column)` $\to$ `[CART Algorithm]` $\to$ `(Single Split Rule)`
+**Student Note:** The double brackets `[["age"]]` are mandatory. Sklearn refuses to learn from a simple list; it demands a Matrix.
+
+```{python}
+cart1 = DecisionTreeRegressor(random_state=20108, max_depth=1)
+
+# Note X should be a matrix instead of series, that's why we need double []
+X = data_train[["age"]]
+Y = data_train["price"]
+cart1.fit(X, Y)
+```
+
+```{python}
+X.shape
+```
+
+```{python}
+#check
+check = data_train[["age"]]
+print(type(check))
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Model Inference & Evaluation
+**The Syntax Anatomy:**
+* `cart1` (**Trained Model**) $\to$ `.predict()` (**Inference**)
+* `[["age"]]`: **Double Brackets** enforce a 2D DataFrame structure (Matrix), required by sklearn.
+
+**Data Flow:** `(N_rows, 1_feature)` $\to$ `(N_rows, 1_prediction_vector)` $\to$ `Scalar (RMSE)`
+**Student Note:** The RMSE tells you the average error in *dollars*. If RMSE = 3000, your model is, on average, off by $3,000.
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: Object Types
+* `data_test[["age"]]`: **DataFrame** (2D Matrix) $\to$ The Input $X$
+* `pred_cart1`: **Numpy Array** (1D Vector) $\to$ The Prediction $\hat{y}$
+* `data_test["price"]`: **Pandas Series** $\to$ The Truth $y$
+
+```{python}
+pred_cart1 = cart1.predict(data_test[["age"]])
+
+rmse_cart1 = root_mean_squared_error(data_test["price"], pred_cart1)
+```
+
+```{python}
+da.plot_decision_tree(
+    cart1, filled=True, rounded=True, special_characters=True, feature_names=["age"]
+)
+```
+
+```{python}
+da.plot_model_predictions(cart1, data_train, "age", "price")
+```
+
+```{python}
+###########
+# Splits at two levels
+# (make sure it stops by setting "max_depth" to 2)
+```
+
+```{python}
+cart2 = DecisionTreeRegressor(random_state=2018, max_depth=2)
+# Note X should be a matrix instead of series, that's why we need double []
+X = data_train[["age"]] #a df not a series
+Y = data_train["price"]
+cart2.fit(X, Y)
+```
+
+```{python}
+da.plot_decision_tree(
+    cart2, filled=True, rounded=True, special_characters=True, feature_names=["age"]
+)
+```
+
+```{python}
+(
+    data_train[["age"]]
+    .assign(Average_price=cart2.predict(X))
+    .groupby("Average_price")
+    .agg(age_min=("age", "min"), age_max=("age", "max"), Count=("age", "count"))
+    .reset_index()
+    .sort_values("age_min")
+    .assign(
+        Category=lambda x: x.apply(
+            lambda row: (f"Age {int(row['age_min'])}-{int(row['age_max'])}"),
+            axis=1,
+        )
+    )
+    .filter(["Category", "Count", "Average_price"])
+    .round(2)
+)
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder: [Tree Interval Reconstruction]
+**The Syntax Anatomy:**
+* `data_train` (**Subject**) $\to$ `groupby().agg()` (**Collapse to Leaves**)
+* `Category=lambda x...`: **Vectorized String Construction** (Creating labels without loops)
+
+**Data Flow:** `(Observations)` $\to$ `(Distinct Price Levels / Tree Leaves)`
+**Student Note:** This table proves that a Regression Tree creates a **Step Function**. You will see constant prices for specific age intervals.
+
+```{python}
+# ------------------------------------------------------------------------------
+# BELLONDA'S "DECISION TREE DECODER"
+# Goal: Turn a black-box Tree Model into a clear "Pricing Menu"
+# Strategy: Vectorized grouping (No loops allowed!)
+# ------------------------------------------------------------------------------
+
+pricing_menu = (
+    data_train[["age"]]  # 1. Start light: Select only the feature we care about
+    .assign(
+        # 2. THE PREDICTION
+        # We attach the model's "opinion" directly to the data.
+        # This creates a map: Actual Age <--> Predicted Price
+        Average_price=cart2.predict(X)
+    )
+    .groupby("Average_price")  # 3. THE PIVOT: Group by the *Prediction*
+    .agg(
+        # 4. THE AGGREGATION
+        # "For everyone predicted at $10k, what are their ages?"
+        age_min=("age", "min"),   # Youngest in this bracket
+        age_max=("age", "max"),   # Oldest in this bracket
+        Count=("age", "count")    # How many cars justify this rule?
+    )
+    .reset_index()            # Kick 'Average_price' back to a column so we can use it
+    .sort_values("age_min")   # Sort logic: Youngest -> Oldest
+    .assign(
+        # 5. THE POLISH (Vectorized String Construction)
+        # We build the human-readable label instantly for the whole column.
+        # Logic: "Age " + Min + "-" + Max
+        Category=lambda x: (
+            "Age " 
+            + x["age_min"].astype(int).astype(str) 
+            + "-" 
+            + x["age_max"].astype(int).astype(str)
+        )
+    )
+    # 6. FINAL CLEANUP
+    # Keep only what the business user needs to see.
+    .filter(["Category", "Count", "Average_price"])
+    .round(2) 
+)
+
+# 7. THE REVEAL
+pricing_menu
+```
+
+```{python}
+data_train.loc[(data_train.age > 1) & (data_train.age < 12), :].shape
+```
+
+```{python}
+pred_cart2 = cart2.predict(data_test[["age"]])
+
+rmse_cart2 = root_mean_squared_error(data_test["price"], pred_cart2)
+```
+
+```{python}
+da.plot_model_predictions(cart2, data_train, "age", "price")
+```
+
+**Note**: min_impurity_decrease in sklearn is considered to be the same as cp in caret, the actual values are different but the purpose is the same
+
+```{python}
+cart3 = DecisionTreeRegressor(random_state=2018, min_impurity_decrease=50000)
+# Note X should be a matrix instead of series, that's why we need double []
+X = data_train[["age"]]
+Y = data_train["price"]
+cart3.fit(X, Y)
+```
+
+```{python}
+pred_cart3 = cart3.predict(data_test[["age"]])
+
+rmse_cart3 = root_mean_squared_error(data_test["price"], pred_cart3)
+rmse_cart3
+```
+
+```{python}
+da.plot_decision_tree(
+    cart3, filled=True, rounded=True, special_characters=True, feature_names=["age"]
+)
+```
+
+```{python}
+da.plot_model_predictions(cart3, data_train, "age", "price")
+```
+
+#### Age only linear regression
+---
+
+```{python}
+linreg1 = pf.feols("price~age", data=data_train)
+linreg1.summary()
+```
+
+```{python}
+pred_linreg1 = linreg1.predict(data_test)
+rmse_ols1 = root_mean_squared_error(data_test["price"], pred_linreg1)
+rmse_ols1
+```
+
+```{python}
+## Scatterplot with predicted values
+pred_linreg1t = linreg1.predict(data_train)
+```
+
+```{python}
+da.plot_model_predictions(linreg1, data_train, "age", "price")
+```
+
+```{python}
+#### Age only only lowess
+
+loess_model = loess(data["age"], data["price"], span=0.8)
+loess_model.fit()
+```
+
+```{python}
+da.plot_model_predictions(loess_model, data_train, "age", "price")
+```
+
+### MULTIPLE PREDICTOR VARIABLES
+
+```{python}
+# Linear regression with multiple variables
+model2_X_vars = [
+    "age",
+    "odometer",
+    "LE",
+    "XLE",
+    "SE",
+    "cond_excellent",
+    "cond_good",
+    "cylind6",
+    "dealer",
+    "chicago",
+]
+model2 = "price ~ " + " + ".join(model2_X_vars)
+linreg2 = pf.feols(model2, data_train)
+linreg2.summary()
+```
+
+```{python}
+pred_linreg2 = linreg2.predict(data_test)
+rmse_linreg2 = root_mean_squared_error(data_test["price"], pred_linreg2)
+rmse_linreg2
+```
+
+```{python}
+# add squared for age, odometer
+model3_X_vars = [
+    "age",
+    "agesq",
+    "odometer",
+    "odometersq",
+    "LE",
+    "XLE",
+    "SE",
+    "cond_excellent",
+    "cond_good",
+    "cylind6",
+    "dealer",
+    "chicago",
+]
+model3 = "price ~ " + " + ".join(model3_X_vars)
+linreg3 = pf.feols(model3, data_train)
+linreg3.summary()
+```
+
+```{python}
+pred_linreg3 = linreg3.predict(data_test)
+rmse_linreg3 = root_mean_squared_error(data_test["price"], pred_linreg3)
+rmse_linreg3
+```
+
+```{python}
+from sklearn.preprocessing import OneHotEncoder
+```
+
+```{python}
+OneHotEncoder().fit_transform(data_train)
+```
+
+```{python}
+# Tree
+
+# Splits at four levels, for illustrative purposes
+# (make sure it stops by setting "maxdepth" to 3)
+
+X = data_train[model2_X_vars]
+y = data_train["price"]
+X_test = data_test[model2_X_vars]
+y_test = data_test["price"]
+
+cart4 = DecisionTreeRegressor(random_state=20108, max_depth=3)
+cart4.fit(X, y)
+```
+
+```{python}
+pred_cart4 = cart4.predict(X_test)
+rmse_cart4 = root_mean_squared_error(y_test, pred_cart4)
+rmse_cart4
+```
+
+```{python}
+da.plot_decision_tree(
+    cart4,
+    filled=True,
+    rounded=True,
+    special_characters=True,
+    feature_names=model2_X_vars,
+)
+```
+
+```{python}
+# alternative to show the use of min_impurity_decrease
+# slightly the same outcome
+```
+
+```{python}
+cart4 = DecisionTreeRegressor(
+    random_state=20108,
+    min_impurity_decrease=145000,
+    min_samples_split=20,
+)
+cart4.fit(X, Y)
+
+pred_cart4 = cart4.predict(X_test)
+rmse_cart4 = root_mean_squared_error(y_test, pred_cart4)
+rmse_cart4
+```
+
+```{python}
+da.plot_decision_tree(
+    cart4,
+    filled=True,
+    rounded=True,
+    special_characters=True,
+    feature_names=model2_X_vars,
+)
+```
+
+```{python}
+# CART M5
+cart5 = DecisionTreeRegressor(random_state=20108, min_impurity_decrease=20000)
+cart5.fit(X, Y)
+```
+
+```{python}
+pred_cart5 = cart5.predict(X_test)
+rmse_cart5 = root_mean_squared_error(y_test, pred_cart5)
+rmse_cart5
+```
+
+```{python}
+da.plot_decision_tree(
+    cart5,
+    filled=True,
+    rounded=True,
+    special_characters=True,
+    feature_names=model2_X_vars,
+)
+```
+
+```{python}
+# build very large tree and prune it
+# in Python this can be done in sklearn's DecisionTreeRegressor with ccp_alpha parameter
+cart6 = DecisionTreeRegressor(random_state=20108, min_samples_split=4, ccp_alpha=30000)
+cart6.fit(X, Y)
+```
+
+```{python}
+pred_cart6 = cart6.predict(X_test)
+rmse_cart6 = root_mean_squared_error(y_test, pred_cart6)
+rmse_cart6
+```
+
+```{python}
+da.plot_decision_tree(
+    cart6,
+    filled=True,
+    rounded=True,
+    special_characters=True,
+    feature_names=model2_X_vars,
+)
+```
+
+```{python}
+# Variable (permutation) importance for model 6 (not in book)
+
+perm_imp = permutation_importance(
+    cart6,
+    X_test,
+    y_test,
+    n_repeats=100,
+    scoring="neg_root_mean_squared_error",
+    random_state=20108,
+)
+
+cart6_var_imp_df = pd.DataFrame(
+    [perm_imp["importances_mean"], X_test.columns],
+    index=["imp", "varname"],
+).T.assign(imp_percentage=lambda x: x["imp"] / x["imp"].sum())
+
+da.plot_variable_importance(cart6_var_imp_df)
+```
+
+```{python}
+# Variable importance for model 6
+
+cart6_var_imp_df = pd.DataFrame(
+    [cart6.feature_importances_, X_test.columns],
+    index=["imp", "varname"],
+).T.assign(imp_percentage=lambda x: x["imp"] / x["imp"].sum())
+
+da.plot_variable_importance(cart6_var_imp_df)
+```
+
+```{python}
+pd.DataFrame(
+    {
+        "Model": ["CART M" + str(i) for i in range(1, 7)]
+        + ["OLS M" + str(i) for i in range(1, 4)],
+        "Number of variables": [1, 1, 7, 7, 7, 7, 1, 7, 7],
+        "Model details": [
+            "2 levels",
+            "3 levels",
+            "min_impurity_decrease=50000",
+            "min_impurity_decrease=140000 & min_samples_split=20",
+            "min_impurity_decrease=20000",
+            "ccp_alpha=30000",
+            "linear",
+            "linear",
+            "w/ polynomial terms",
+        ],
+        "RMSE": [
+            rmse_cart1,
+            rmse_cart2,
+            rmse_cart3,
+            rmse_cart4,
+            rmse_cart5,
+            rmse_cart6,
+            rmse_ols1,
+            rmse_linreg2,
+            rmse_linreg3,
+        ],
+    }
+).set_index("Model").round(2)
+```
+
+

@@ -1,0 +1,547 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 18
+**CH18 Forecasting daily ticket sales for a swimming pool**
+
+using swim data
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plt
+import pandas_market_calendars as mcal
+import pyfixest as pf
+from sklearn.metrics import root_mean_squared_error
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/swim-transactions/clean/"
+data_out = dirname + "da_case_studies/ch18-swim-transactions/"
+output = dirname + "da_case_studies/ch18-swim-transactions/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+### Read data
+
+```{python}
+daily_agg = pd.read_csv(os.path.join(data_in, "swim_work.csv"), parse_dates=["date"])
+# daily_agg = pd.read_csv("https://osf.io/download/jcxmk/", parse_dates=["date"])
+```
+
+```{python}
+daily_agg.head()
+```
+
+```{python}
+daily_agg["year"] = daily_agg["date"].dt.year
+daily_agg["quarter"] = daily_agg["date"].dt.quarter
+daily_agg["month"] = daily_agg["date"].dt.month
+daily_agg["day"] = daily_agg["date"].dt.day
+daily_agg["dow"] = daily_agg["date"].dt.dayofweek + 1
+daily_agg["weekend"] = daily_agg["dow"].isin([6, 7])
+```
+
+```{python}
+daily_agg["school_off"] = (
+    ((daily_agg["day"] > 15) & (daily_agg["month"] == 5) & (daily_agg["day"] <= 30))
+    | ((daily_agg["month"] == 6) | (daily_agg["month"] == 7))
+    | ((daily_agg["day"] < 15) & (daily_agg["month"] == 8))
+    | ((daily_agg["day"] > 20) & (daily_agg["month"] == 12))
+)
+```
+
+```{python}
+daily_agg["trend"] = daily_agg.index + 1
+```
+
+```{python}
+# Get holiday calendar ----------------------------------
+```
+
+```{python}
+nyse = mcal.get_calendar("NYSE")
+
+holidays = nyse.holidays().holidays
+
+daily_agg["isHoliday"] = daily_agg["date"].isin(holidays)
+```
+
+```{python}
+daily_agg.describe()
+```
+
+### Define vars for analysis
+
+```{python}
+daily_agg["q_month"] = daily_agg.groupby("month")["QUANTITY"].transform("mean")
+
+daily_agg["q_ln"] = np.log(daily_agg["QUANTITY"])
+
+# Replace inf values with NaN
+daily_agg["q_ln"] = daily_agg["q_ln"].replace([np.inf, -np.inf], np.nan)
+
+daily_agg["tickets"] = daily_agg.groupby(["month", "dow"])["QUANTITY"].transform("mean")
+
+daily_agg["tickets_ln"] = daily_agg.groupby(["month", "dow"])["q_ln"].transform("mean")
+
+daily_agg["dow_abb"] = daily_agg["date"].dt.day_name().str[:3]
+
+daily_agg["month_abb"] = daily_agg["date"].dt.month_name().str[:3]
+```
+
+## Descriptive graphs
+
+```{python}
+filtered_data = daily_agg[daily_agg["year"] == 2015].reset_index()
+
+sns.lineplot(data=filtered_data, x="date", y="QUANTITY", linewidth=0.6)
+date_ticks = ["2015-01-01", "2015-04-01", "2015-07-01", "2015-10-01", "2016-01-01"]
+plt.xticks(date_ticks, [pd.to_datetime(date).strftime("%d%b%Y") for date in date_ticks])
+plt.xlabel("Date (day)")
+plt.ylabel("Daily ticket sales")
+plt.show()
+```
+
+```{python}
+filtered_data = daily_agg.loc[
+    (daily_agg.year >= 2010) & (daily_agg.year <= 2014), :
+].reset_index()
+
+sns.lineplot(data=filtered_data, x="date", y="QUANTITY", linewidth=0.3)
+date_ticks = [
+    "2010-01-01",
+    "2011-01-01",
+    "2012-01-01",
+    "2013-01-01",
+    "2014-01-01",
+    "2015-01-01",
+]
+plt.xticks(date_ticks, [pd.to_datetime(date).strftime("%d%b%Y") for date in date_ticks])
+plt.xlabel("Date (day)")
+plt.ylabel("Daily ticket sales")
+plt.show()
+```
+
+```{python}
+month_order = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]
+sns.boxplot(
+    data=daily_agg,
+    x="month_abb",
+    y="QUANTITY",
+    fliersize=3,
+    order=month_order,
+    flierprops={
+        "markerfacecolor": da.color[3],
+        "markeredgecolor": da.color[3],
+        "alpha": 0.6,
+    },
+    boxprops={"facecolor": "white", "edgecolor": da.color[0]},
+    whiskerprops={"color": da.color[0]},
+    medianprops={"color": da.color[0], "linewidth": 2},
+    showcaps=False,
+)
+plt.yticks(np.arange(0, 400, 100))
+plt.xlabel("Date (month)")
+plt.ylabel("Daily ticket sales")
+plt.grid(axis="x", color="gray", linestyle="-", linewidth=0.5)
+plt.show()
+```
+
+```{python}
+dow_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+sns.boxplot(
+    data=daily_agg,
+    x="dow_abb",
+    y="QUANTITY",
+    fliersize=3,
+    order=dow_order,
+    flierprops={
+        "markerfacecolor": da.color[3],
+        "markeredgecolor": da.color[3],
+        "alpha": 0.6,
+    },
+    boxprops={"facecolor": "white", "edgecolor": da.color[0]},
+    whiskerprops={"color": da.color[0]},
+    medianprops={"color": da.color[0], "linewidth": 2},
+    showcaps=False,
+)
+plt.yticks(np.arange(0, 400, 100))
+plt.xlabel("Day of the week")
+plt.ylabel("Daily ticket sales")
+plt.grid(axis="x", color="gray", linestyle="-", linewidth=0.5)
+plt.show()
+```
+
+```{python}
+# to check for interactions, look at the heatmap
+plt.figure(figsize=(9, 6))
+daily_agg["dow_abb_ordered"] = pd.Categorical(
+    daily_agg["dow_abb"], categories=dow_order, ordered=True
+)
+daily_agg["month_abb_ordered"] = pd.Categorical(
+    daily_agg["month_abb"], categories=reversed(month_order), ordered=True
+)
+
+agg_data = daily_agg.groupby(["month_abb_ordered", "dow_abb_ordered"], as_index=False)[
+    "tickets"
+].mean()
+
+heatmap_data = agg_data.pivot(
+    index="month_abb_ordered", columns="dow_abb_ordered", values="tickets"
+)
+
+sns.heatmap(
+    heatmap_data,
+    cmap="viridis_r",
+    linewidths=0.5,
+    linecolor="white",
+    cbar_kws={"shrink": 0.4, "aspect": 5},
+)
+
+plt.xlabel("Day of the week")
+plt.ylabel("Month")
+plt.yticks(rotation=0)
+
+cbar = plt.gca().collections[0].colorbar
+cbar.ax.tick_params(labelsize=10)
+cbar.set_label("Tickets", fontsize=10)
+cbar.set_ticks([50, 100, 150])
+
+plt.show()
+```
+
+```{python}
+# not in book
+plt.figure(figsize=(9, 6))
+agg_data = daily_agg.groupby(["month_abb_ordered", "dow_abb_ordered"], as_index=False)[
+    "tickets_ln"
+].mean()
+
+heatmap_data = agg_data.pivot(
+    index="month_abb_ordered", columns="dow_abb_ordered", values="tickets_ln"
+)
+
+sns.heatmap(
+    heatmap_data,
+    cmap="viridis_r",
+    linewidths=0.5,
+    linecolor="white",
+    cbar_kws={"shrink": 0.4, "aspect": 5, "label": "Log tickets"},
+)
+
+plt.xlabel("Day of the week")
+plt.ylabel("Month")
+plt.yticks(rotation=0)
+
+cbar = plt.gca().collections[0].colorbar
+cbar.ax.tick_params(labelsize=10)
+
+plt.show()
+```
+
+## Prediction
+
+### Creat train/holdout data
+
+```{python}
+factor_cols = ["month", "dow", "isHoliday", "school_off"]
+daily_agg[factor_cols] = daily_agg[factor_cols].astype("category")
+
+data_holdout = daily_agg.loc[daily_agg["year"] == 2016, :]
+
+data_train = daily_agg.loc[daily_agg["year"] < 2016, :]
+```
+
+```{python}
+def inserted_test_set_cv(
+    formula: str,
+    data: pd.DataFrame,
+    group_col: str,
+    correct_log_transformation_bias: bool = False,
+) -> float:
+    """
+    Perform inserted test set cross-validation.
+    Args:
+        formula (str): The formula for the regression model.
+        data (pd.DataFrame): The data to be used for cross-validation.
+        group_col (str): The column name to group by for cross-validation.
+        correct_log_transformation_bias (bool): Whether to correct for log transformation bias.
+    Returns:
+        float: The mean RMSE across all test sets.
+    """
+    # Drop observations with NaN values in the y_variable
+    y_variable = formula.split("~")[0].strip()
+    data = data.dropna(subset=[y_variable])
+
+    test_sets = data[group_col].unique()
+    rmse_folds = []
+
+    for test_set in test_sets:
+        data_train = data.loc[data[group_col] != test_set, :]
+        data_test = data.loc[data[group_col] == test_set, :]
+
+        model = pf.feols(formula, data=data_train)
+
+        y_hat = model.predict(data_test)
+        y_true = data_test[y_variable]
+        rmse = root_mean_squared_error(y_true, y_hat)
+
+        if correct_log_transformation_bias:
+            y_hat = np.exp(y_hat) * np.exp(rmse**2 / 2)
+            y_true = np.exp(y_true)
+            rmse = root_mean_squared_error(y_true, y_hat)
+
+        rmse_folds.append(rmse)
+
+    return np.mean(rmse_folds)
+```
+
+```{python}
+# Model 1 linear trend + monthly seasonality
+model1 = "QUANTITY ~ trend + month"
+
+# Model 2 linear trend + monthly seasonality + days of week seasonality
+model2 = "QUANTITY ~ trend + month + dow"
+
+# Model 3 linear trend + monthly seasonality + days of week seasonality + holidays
+model3 = "QUANTITY ~ trend + month + dow + isHoliday"
+
+# Model 4 linear trend + monthly seasonality + days of week seasonality + holidays + sch*dow
+model4 = "QUANTITY ~ trend + month + dow + isHoliday + school_off*dow"
+
+# Model 5 linear trend + monthly seasonality + days of week seasonality + holidays + interactions
+model5 = "QUANTITY ~ trend + month + dow + isHoliday + school_off*dow + weekend*month"
+```
+
+```{python}
+cross_validated_rmses = []
+for model in [model1, model2, model3, model4, model5]:
+    cross_validated_rmses.append(inserted_test_set_cv(model, data_train, "year"))
+```
+
+```{python}
+# Model 6 multiplicative trend and seasonality
+# Take logs, predict log values and transform back with correction term
+
+model6 = "q_ln ~ trend + month + dow + isHoliday + school_off*dow"
+
+rmse6 = inserted_test_set_cv(
+    model6, data_train, "year", correct_log_transformation_bias=True
+)
+cross_validated_rmses.append(rmse6)
+```
+
+### Use prophet prediction
+
+```{python}
+from prophet import Prophet
+from prophet.diagnostics import cross_validation
+from prophet.diagnostics import performance_metrics
+```
+
+```{python}
+model_prophet = Prophet(
+    seasonality_mode="additive",
+    yearly_seasonality="auto",
+    weekly_seasonality="auto",
+    growth="linear",
+    daily_seasonality=True,
+)
+
+model_prophet = Prophet.add_country_holidays(model_prophet, "US")
+```
+
+```{python}
+model_prophet = Prophet.fit(
+    model_prophet,
+    df=data_train[["date", "QUANTITY"]].rename({"date": "ds", "QUANTITY": "y"}, axis=1),
+)
+```
+
+```{python}
+cv_pred = cross_validation(
+    model_prophet, initial="365 days", period="365 days", horizon="365 days"
+)
+```
+
+```{python}
+rmse_prophet_cv = performance_metrics(cv_pred, rolling_window=1)["rmse"].values[0]
+cross_validated_rmses.append(rmse_prophet_cv)
+```
+
+```{python}
+# Note: M6 log model rmse is slightly different from book
+pd.DataFrame(
+    cross_validated_rmses,
+    ["M" + str(i) for i in range(1, 6)] + ["M6 (log)", "M7 (Prophet)"],
+    columns=["RMSE"],
+).round(5)
+```
+
+## Evaluate best model on holdout set
+
+```{python}
+best_model = pf.feols(model5, data=data_train)
+
+data_holdout["y_hat_5"] = best_model.predict(data_holdout)
+```
+
+```{python}
+rmse_holdout_best = root_mean_squared_error(data_holdout.QUANTITY, data_holdout.y_hat_5)
+rmse_holdout_best
+```
+
+### Plot best predictions
+
+```{python}
+# graph relative RMSE (on holdout) per month
+
+group = data_holdout.sort_values(by=["date"]).groupby("month")
+rmse_monthly = pd.DataFrame(
+    {
+        "date": group["date"].first(),
+        "RMSE": group.apply(
+            lambda x: root_mean_squared_error(x["QUANTITY"], x["y_hat_5"])
+        ),
+        "RMSE_norm": group.apply(
+            lambda x: root_mean_squared_error(x["QUANTITY"], x["y_hat_5"])
+            / np.mean(x["QUANTITY"])
+        ),
+    }
+).reset_index(drop=True)
+```
+
+### Figure 18.7 b)
+
+```{python}
+ax = sns.barplot(x="date", y="RMSE_norm", data=rmse_monthly)
+ax.set_xticklabels(rmse_monthly["date"].dt.strftime("%b"))
+ax.set_yticks(np.arange(0, 1.6, 0.5))
+ax.set_xlabel("Date (month)")
+ax.set_ylabel("RMSE (normalized by monthly sales)")
+plt.grid(axis="x", color="gray", linestyle="-", linewidth=0.5)
+plt.show()
+```
+
+```{python}
+plotdata = (
+    data_holdout.filter(["date", "month", "QUANTITY", "y_hat_5"])
+    .melt(id_vars=["date", "month"])
+    .merge(data_holdout.filter(["date", "QUANTITY"]), on="date")
+    .merge(data_holdout.filter(["date", "y_hat_5"]), on="date")
+    .rename(columns={"QUANTITY": "ymin", "y_hat_5": "ymax"})
+    .assign(
+        variable=lambda x: x["variable"].map(
+            {"QUANTITY": "Actual", "y_hat_5": "Predicted"}
+        )
+    )
+)
+```
+
+### Figure 18.6
+
+```{python}
+sns.lineplot(x="date", y="value", hue="variable", style="variable", data=plotdata)
+
+xticks = pd.to_datetime(
+    ["2016-01-01", "2016-03-01", "2016-05-01", "2016-07-01", "2016-09-01", "2016-11-01"]
+)
+xlabels = ["01Jan2016", "01Mar2016", "01May2016", "01Jul2016", "01Sep2016", "01Nov2016"]
+plt.xticks(xticks, labels=xlabels, fontsize=9)
+plt.xlim((datetime(2016, 1, 1), datetime(2017, 1, 1)))
+plt.xlabel("Date (day)")
+plt.ylabel("Daily ticket sales")
+plt.legend(bbox_to_anchor=(0.54, 0.77), frameon=False, ncol=2)
+plt.show()
+```
+
+### Figure 18.7 a)
+
+```{python}
+plotdata_august = plotdata[plotdata["month"] == 8].reset_index()
+sns.lineplot(
+    x="date",
+    y="value",
+    hue="variable",
+    style="variable",
+    data=plotdata_august,
+    linewidth=1.5,
+)
+
+plt.fill_between(
+    plotdata_august.loc[lambda x: x["variable"] == "Actual", "date"],
+    plotdata_august.loc[lambda x: x["variable"] == "Actual", "ymin"],
+    plotdata_august.loc[lambda x: x["variable"] == "Actual", "ymax"],
+    color=da.color[3],
+    alpha=0.2,
+)
+plt.xticks(
+    pd.to_datetime(
+        ["2016-08-01", "2016-08-08", "2016-08-15", "2016-08-22", "2016-08-29"]
+    ),
+    labels=["01Aug", "08Aug", "15Aug", "22Aug", "29Aug"],
+)
+plt.ylim(0, 150)
+plt.xlim((datetime(2016, 8, 1), datetime(2016, 8, 31)))
+plt.yticks(np.arange(0, 151, 50))
+plt.xlabel("Date (day)")
+plt.ylabel("Daily ticket sales")
+plt.legend(
+    title="", loc="upper left", bbox_to_anchor=(0.54, 0.77), frameon=False, ncol=2
+)
+
+plt.show()
+```
+
+

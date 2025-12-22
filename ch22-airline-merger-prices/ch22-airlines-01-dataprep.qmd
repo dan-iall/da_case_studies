@@ -1,0 +1,230 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### CHAPTER 22
+**CH22A How does a merger between airlines affect prices?**
+
+ using the airline-tickets-usa dataset
+ 
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/airline-tickets-usa/clean/"
+data_out = dirname + "da_case_studies/ch22-airline-merger-prices/"
+output = dirname + "da_case_studies/ch22-airline-merger-prices/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+from py_helper_functions import *
+```
+
+## Data Preparation Steps and Descriptive Statistics
+
+```{python}
+#data = pd.read_stata(data_in + "originfinal-panel.dta")
+data = pd.read_stata("https://osf.io/zw2h9/download")
+```
+
+```{python}
+data = data.loc[lambda x: (x["year"] == 2011) | (x["year"] == 2016)].reset_index(
+    drop=True
+)
+```
+
+```{python}
+# * create total number of passengers from shares
+# * so we can get aggreagate shares
+
+data["ptotalAA"] = data["shareAA"] * data["passengers"]
+data["ptotalUS"] = data["shareUS"] * data["passengers"]
+data["ptotallargest"] = data["sharelargest"] * data["passengers"]
+
+data_agg = (
+    data.groupby(["origin", "finaldest", "return", "year"])
+    .agg(
+        airports=("airports", "first"),
+        return_sym=("return_sym", "first"),
+        stops=("stops", "first"),
+        ptotalAA=("ptotalAA", sum),
+        ptotalUS=("ptotalUS", sum),
+        ptotallargest=("ptotallargest", sum),
+        passengers=("passengers", sum),
+        itinfare=("itinfare", sum),
+    )
+    .reset_index()
+)
+```
+
+```{python}
+data_agg["after"] = np.where(data_agg["year"] == 2016, 1, 0)
+data_agg["before"] = np.where(data_agg["year"] == 2011, 1, 0)
+data_agg["avgprice"] = data_agg["itinfare"] / data_agg["passengers"]
+data_agg["shareAA"] = data_agg["ptotalAA"] / data_agg["passengers"]
+data_agg["shareUS"] = data_agg["ptotalUS"] / data_agg["passengers"]
+data_agg["sharelargest"] = data_agg["ptotallargest"] / data_agg["passengers"]
+data_agg["AA"] = np.where(data_agg["shareAA"] > 0, 1, 0)
+data_agg["US"] = np.where(data_agg["shareUS"] > 0, 1, 0)
+data_agg["US"] = np.where(data_agg["shareUS"] > 0, 1, 0)
+data_agg["AA_and_US"] = np.where(
+    (data_agg["shareAA"] > 0) & (data_agg["shareUS"]) > 0, 1, 0
+)
+data_agg["AA_or_US"] = np.where(
+    (data_agg["shareAA"] > 0) | (data_agg["shareUS"]) > 0, 1, 0
+)
+```
+
+```{python}
+# create numeric ID for market
+data_agg["market"] = (
+    data_agg["origin"]
+    + "_"
+    + data_agg["finaldest"]
+    + "_"
+    + data_agg["return"].apply(str)
+)
+```
+
+```{python}
+# passengers before and after
+data_agg["pass_bef_id"] = np.where(
+    data_agg["before"] == 1, data_agg["passengers"], np.nan
+)
+data_agg["pass_aft_id"] = np.where(
+    data_agg["after"] == 1, data_agg["passengers"], np.nan
+)
+
+data_agg["pass_bef"] = data_agg.groupby("market")["pass_bef_id"].transform(np.nanmean)
+data_agg["pass_aft"] = data_agg.groupby("market")["pass_aft_id"].transform(np.nanmean)
+```
+
+```{python}
+# balanced vs unbalanced part of panel
+data_agg["balanced"] = data_agg.groupby("market")["origin"].transform("count") == 2
+```
+
+```{python}
+data_agg.groupby("balanced").agg(
+    sum_passengers=("passengers", sum), n=("origin", "count")
+)
+```
+
+### Define treated and untreated markets
+- treated: both AA and US present in the before period
+- untreated: neither AA nor US present in the before period OR only AA or only US in before period
+
+**NOTE:** There is a error in the book on p628: 
+
+Original version with error:
+
+This definition of treated and untreated markets left some markets neither treated nor untreated: those with only American or only US Airways present in 2011. For the main analysis we **dropped these from the data**.
+
+Corrected:
+
+This definition of treated and untreated markets left some markets neither treated nor untreated: those with only American or only US Airways present in 2011. For the main analysis we **kept these in the data as untreated**.
+
+```{python}
+data_agg = data_agg.merge(
+    data_agg.loc[lambda x: x["balanced"] == 1]
+    .assign(
+        treated=lambda x: (x["AA_and_US"] == 1) & (x["before"] == 1),
+        untreated=lambda x: (x["AA_and_US"] == 0) & (x["before"] == 1),
+        smallmkt=lambda x: (x["passengers"] < 5000) & (x["before"] == 1),
+    )
+    .groupby("market")
+    .agg(
+        treated=("treated", max),
+        untreated=("untreated", max),
+        smallmkt=("smallmkt", max),
+    )
+    .reset_index(),
+    on="market",
+    how="left",
+)
+```
+
+```{python}
+data_agg["lnavgp"] = np.where(
+    np.isinf(np.log(data_agg["avgprice"])), np.nan, np.log(data_agg["avgprice"])
+)
+data_agg["d_lnavgp"] = data_agg.groupby("market")["lnavgp"].transform("diff")
+```
+
+## Describe
+
+```{python}
+# describe yearly data
+data_agg[["year", "passengers"]].groupby("year").describe(
+    percentiles=[0.25, 0.5, 0.75, 0.9]
+).round(0)
+```
+
+```{python}
+data_agg.query('(origin=="JFK") & (finaldest=="LAX")')[
+    ["market", "origin", "finaldest", "return", "year", "passengers"]
+]
+```
+
+```{python}
+data_agg.query("year == 2011")[["smallmkt", "passengers"]].groupby(
+    "smallmkt"
+).describe().round(0)
+```
+
+```{python}
+# describe balanced
+data_agg.groupby(["year", "balanced"])["passengers"].describe(percentiles=[]).round(1)
+```
+
+```{python}
+# describe treatment
+data_agg.groupby(["year", "treated", "untreated"]).describe(percentiles=[]).round(1)
+```
+
+```{python}
+# describe outcome
+data_agg.query("before == 1")["avgprice"].describe().round(2)
+```
+
+```{python}
+data_agg.query("avgprice == 0")["passengers"].describe().round(2)
+```
+
+```{python}
+data_agg.to_pickle(data_out + "ch22-airline-workfile.pkl")
+```
+
+

@@ -1,0 +1,345 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### CHAPTER 21
+**CH20A Founder/family ownership and quality of management**
+
+using the wms-management dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/wms-management-survey/clean/"
+data_out = dirname + "da_case_studies/ch21-ownership-management-quality/"
+output = dirname + "da_case_studies/ch21-ownership-management-quality/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+```
+
+### Read in data
+
+```{python}
+# !!! make sure you have run ch21-wms-01-dataprep.ipynb before
+data = pd.read_csv(data_out+"wms_da_textbook-work.csv")
+```
+
+```{python}
+data.groupby("foundfam_owned")[["management"]].mean()
+```
+
+### Set variables to use
+
+```{python}
+y_var = "management"
+x_var = "foundfam_owned"
+
+control_vars = [
+    "degree_nm",
+    "degree_nm_sq",
+    "compet_moder",
+    "compet_strong",
+    "lnemp",
+    "age_young",
+    "age_old",
+    "age_unknown",
+]
+
+control_vars_to_interact = ["industry", "countrycode"]
+```
+
+## Regressions
+
+```{python}
+# OLS with no control vars.
+formula1 = y_var + " ~ " + x_var
+ols1 = pf.feols(formula1, data=data)
+```
+
+```{python}
+# OLS with all control vars
+formula2 = (
+    y_var + " ~ " + x_var + " + " + " + ".join(control_vars + control_vars_to_interact)
+)
+ols2 = pf.feols(formula2, data=data)
+```
+
+```{python}
+# OLS with all controls + interactions
+formula3 = (
+    y_var
+    + " ~ "
+    + x_var
+    + "+"
+    + ":".join(control_vars_to_interact)
+    + "+("
+    + "+".join(control_vars)
+    + ")*("
+    + "+".join(control_vars_to_interact)
+    + ")"
+)
+ols3 = pf.feols(formula3, data=data)
+```
+
+### Table 21.1 Estimates of the effect of founder/family ownership on the quality of management. Multiple regression results
+
+```{python}
+pf.etable(
+    [ols1, ols2, ols3],
+    digits=2,
+    show_se_type=False,
+    model_heads=["No confounders", "With confounders", "With confounders interacted"],
+    head_order="h",
+    keep=["foundfam_owned", "Intercept"],
+    labels={"foundfam_owned": "Founder/family owned"},
+)
+```
+
+## Exact matching
+
+```{python}
+data["management"].describe()
+```
+
+```{python}
+data["empbin5"] = pd.cut(
+    data["emp_firm"],
+    bins=data["emp_firm"].quantile(np.arange(0, 1.01, 0.2)),
+    labels=["1", "2", "3", "4", "5"],
+    include_lowest=True,
+    right=False,
+).fillna("5")
+data["agecat"] = (
+    (data["age_young"] == True)
+    + 2 * (data["age_mid"] == True)
+    + 3 * (data["age_old"] == True)
+    + 4 * (data["age_unknown"] == True)
+)
+```
+
+```{python}
+data["n"] = 1
+data["n1"] = data["foundfam_owned"]
+data["n0"] = 1 - data["foundfam_owned"]
+data["y0"] = np.where(data["foundfam_owned"] == 0, data["management"], None)
+data["y1"] = np.where(data["foundfam_owned"] == 1, data["management"], None)
+```
+
+```{python}
+data_agg = (
+    data.groupby(
+        [
+            "degree_nm_bins",
+            "agecat",
+            "competition",
+            "empbin5",
+            "industry",
+            "countrycode",
+        ]
+    )
+    .agg({"n": "sum", "n0": "sum", "n1": "sum", "y0": "mean", "y1": "mean"})
+    .reset_index()
+)
+```
+
+```{python}
+# theoretical combinations
+data_agg.shape[0]
+```
+
+```{python}
+# combinations in the data
+data_agg = data_agg.dropna(subset=["y0", "y1"], how="all")
+data_agg.shape[0]
+```
+
+```{python}
+# firms with exact match
+data_agg.loc[((data_agg["n0"] >= 1) & (data_agg["n1"] >= 1)), "n"].sum()
+```
+
+```{python}
+# firms with no exact match
+data_agg.loc[((data_agg["n0"] == 0) | (data_agg["n1"] == 0)), "n"].sum()
+```
+
+```{python}
+# random order just for the examples
+np.random.seed(123)
+data_sample = data_agg.sample(n=340)[
+    [
+        "industry",
+        "countrycode",
+        "degree_nm_bins",
+        "competition",
+        "agecat",
+        "empbin5",
+        "n1",
+        "n0",
+        "n",
+    ]
+]
+```
+
+```{python}
+# examples with founder/family only
+data_sample.loc[lambda x: (x["n1"] == 1) & (x["n0"] == 0)].head(8)
+```
+
+```{python}
+# examples with other only:
+data_sample.loc[lambda x: (x["n1"] == 0) & (x["n0"] == 1)].head(8)
+```
+
+```{python}
+# examples of similar firms unmatched
+data_sample.loc[
+    lambda x: (x["countrycode"] == "us") & (x["industry"] == "food") & (x["n"] == 1)
+]
+```
+
+```{python}
+# ATE/ATET by exact matching:
+data_agg["d"] = data_agg["y1"] - data_agg["y0"]
+filtered_df = data_agg[(data_agg["n0"] > 0) & (data_agg["n1"] > 0)]
+
+ATE = np.average(filtered_df["d"], weights=filtered_df["n"])
+ATET = np.average(filtered_df["d"], weights=filtered_df["n1"])
+
+summary = pd.DataFrame({"ATE": [ATE], "ATET": [ATET]})
+print(summary)
+```
+
+## Matching on the propensity score 
+
+```{python}
+from psm import psmatch
+
+data_pscore = data[[y_var] + [x_var] + control_vars + control_vars_to_interact].dropna()
+formula_pscore1 = x_var + "~" + "+".join(control_vars + control_vars_to_interact)
+
+result1 = psmatch(data_pscore, x_var, y_var, formula_pscore1, n_bootstraps=200)
+```
+
+```{python}
+formula_pscore2 = (
+    x_var
+    + " ~ "
+    + ":".join(control_vars_to_interact)
+    + "+("
+    + "+".join(control_vars)
+    + ")*("
+    + "+".join(control_vars_to_interact)
+    + ")"
+)
+
+result2 = psmatch(data_pscore, x_var, y_var, formula_pscore2, n_bootstraps=50)
+```
+
+```{python}
+def format_psmatch_results(r, title: str, round_digits=2):
+    r = [str(np.round(r, round_digits)) for r in r]
+    return pd.DataFrame(
+        {
+            "": ["ATE estimate", "", "ATET estimate", ""],
+            title: [r[4], "(" + r[5] + ")", r[0], "(" + r[1] + ")"],
+        }
+    ).set_index("")
+
+
+print(
+    pd.concat(
+        [
+            format_psmatch_results(result1, "All confounders"),
+            format_psmatch_results(
+                result2, "All confounders with industry and country"
+            ),
+        ],
+        axis=1,
+    )
+)
+print(
+    """
+    Note: Bootstrapped standard errors are in parentheses."""
+)
+print(
+    """
+    Note: Estimates are different for `All confounders
+    with industry and country` model than in book. This is because 
+    Stata drops variables and observations because of 
+    multicollinearity, while Python uses `l1` regularization.
+    """
+)
+```
+
+## Check common support
+
+```{python}
+# Cross-tabulations for competition, industry, country
+
+combined = pd.concat(
+    [
+        pd.crosstab(data["foundfam_owned"], data[col], normalize="index")
+        for col in ["compet_moder", "compet_strong", "industry", "countrycode"]
+    ],
+    axis=1,
+)
+combined
+```
+
+```{python}
+# Group by 'foundfam_owned' and get descriptive statistics for 'degree_nm'
+degree_summary = (
+    data.groupby("foundfam_owned")["degree_nm"]
+    .describe(percentiles=[0.01, 0.05, 0.95, 0.99])
+    .reset_index()
+)
+degree_summary
+```
+
+```{python}
+# Group by 'foundfam_owned' and get descriptive statistics for 'emp_firm'
+employment_summary = (
+    data.groupby("foundfam_owned")["emp_firm"]
+    .describe(percentiles=[0.01, 0.05, 0.95, 0.99])
+    .reset_index()
+)
+```
+
+

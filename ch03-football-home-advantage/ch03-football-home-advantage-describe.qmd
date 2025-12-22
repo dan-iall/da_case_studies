@@ -1,0 +1,179 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 03
+**CH03C Measurig home team advantage in football**
+
+using the football dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib.ticker import PercentFormatter
+
+warnings.filterwarnings('ignore')
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/football/clean/"
+data_out = dirname + "da_case_studies/ch03-football-home-advantage/"
+output = dirname + "da_case_studies/ch03-football-home-advantage/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+df = pd.read_csv(data_in + "epl_games.csv")
+#df = pd.read_csv("https://osf.io/bdjt5/download")
+df.head()
+```
+
+```{python}
+df = df.loc[df["season"] == 2016, :].reset_index(drop=True)
+df.head()
+```
+
+```{python}
+df.shape
+```
+
+```{python}
+df.head().T
+```
+
+```{python}
+df["home_goaladv"] = df["goals_home"] - df["goals_away"]
+#df = df.assign(home_goaladv = df["goals_home"] - df["goals_away"])
+```
+
+### Table 3.7 Describing the home team – away team goal difference (and 3.9)
+
+```{python}
+df.info()
+```
+
+```{python}
+new_df = df['home_goaladv'].describe().round(1).reset_index()
+new_df
+```
+
+```{python}
+#creating a data frame from a dict of lists
+pd.DataFrame.from_dict(
+    {
+        "Statistics": [
+            "Mean",
+            "Standard deviation",
+            "Percent positive",
+            "Percent zero",
+            "Percent negative",
+            "Number of observations",
+        ],
+        "Value": [
+            df["home_goaladv"].describe()["mean"],
+            df["home_goaladv"].describe()["std"], # Standard deviation
+            (df["home_goaladv"] > 0).sum() / df["home_goaladv"].shape[0] * 100, # Percent positive
+            (df["home_goaladv"] == 0).sum() / df["home_goaladv"].shape[0] * 100, # Percent zero
+            (df["home_goaladv"] < 0).sum() / df["home_goaladv"].shape[0] * 100, # Percent negative
+            df["home_goaladv"].describe()["count"],
+        ],
+    }
+).round(1)
+```
+
+### Figure 3.9 The distribution of home team – away team goal difference
+
+```{python}
+binwidth = 1
+bins = np.arange(-6, 7, binwidth)
+hist, edges = np.histogram(df['home_goaladv'], bins=bins, density=True)
+
+percentages = hist * 100
+
+sns.histplot(
+    df['home_goaladv'],
+    bins=bins,
+    stat="density",
+    color=da.color[0],
+    alpha = 1,
+    #edgecolor="white",
+    kde=False
+)
+
+for i in range(len(hist)):
+    plt.text(
+        edges[i] + binwidth / 2,  
+        hist[i] + 0.01,  
+        f"{percentages[i]:.1f}",
+        ha="center",
+        va="bottom",
+        size=10
+    )
+
+plt.xlabel("Goal difference")
+plt.ylabel("Share of games (percent)")
+plt.xticks(ticks=np.arange(-6.5, 7.5, 1),labels=np.arange(-6.5, 7.5, 1)-0.5)
+plt.yticks(np.arange(0, 0.26, 0.05))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.xlim(-6, 6)
+plt.ylim(0, 0.25)
+plt.show()
+```
+
+look at goal advantage by team
+
+table *not* used in book, but interesting
+
+```{python}
+df.loc[
+    df["team_home"].isin(["Chelsea", "Arsenal", "Leicester", "Stoke", "West Ham"])
+].groupby("team_home").agg(
+    Count=("home_goaladv", "size"),
+    Mean=("home_goaladv", np.mean),
+    Median=("home_goaladv", np.median),
+    Std=("home_goaladv", np.std),
+    Min=("home_goaladv", min),
+)
+```
+
+```{python}
+df.loc[
+    df["team_home"].isin(["Chelsea", "Arsenal", "Leicester", "Stoke", "West Ham"]),
+    "home_goaladv",
+].describe()
+```
+
+

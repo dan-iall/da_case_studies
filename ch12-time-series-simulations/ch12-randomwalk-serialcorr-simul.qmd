@@ -1,0 +1,225 @@
+---
+title: Data Analysis for Business, Economics, and Policy
+jupyter: python3
+---
+
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+ 
+### CHAPTER 12
+**CH12 Time series simulations**
+
+version 0.9.0 2025-08-14
+ 
+ 
+
+
+```{python}
+import os
+import sys
+import warnings
+import seaborn as sns
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+output = dirname + "da_case_studies/ch02-football-manager-success/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+### PART 1
+
+Random walk simulation
+
+Generate k random walks across time {0, 1, ... , T}
+
+```{python}
+T = 100  # number of obs
+k = 5  # nr of random walks generated
+```
+
+Define function for generating a random walk series
+
+```{python}
+def random_walk(initial_value: float, T: int, seed=None) -> np.array:
+    """
+    Generate random walk series of T length.
+
+       Parameters
+    ----------
+    initial_value : float
+
+    T : int
+        Length of the random walk series
+    seed : bool or int, defalt=None
+        Set seed to get the same series.
+        For reproducibility.
+    """
+    rng = np.random.default_rng(seed)
+    return initial_value + np.insert(np.cumsum(rng.normal(0, 1, T - 1)), 0, 0)
+```
+
+Each random walk starts from 0
+
+```{python}
+initial_value = 0
+```
+
+```{python}
+rws = (
+    pd.DataFrame(
+        [
+            random_walk(initial_value, T, seed=i) for i in range(k)
+        ],  # set seed=None here if you want a different result
+        index=[f"V{i+1}" for i in range(k)],
+        columns=[i for i in range(1, T + 1)],
+    )
+    .T.reset_index()
+    .rename(columns={"index": "time"})
+)
+rws
+```
+
+Melt dataframe for plotnine
+
+```{python}
+rws = rws.melt(id_vars="time")
+```
+
+### Figure 12.1 Five artificially generated random walk series
+
+```{python}
+sns.lineplot(
+    data=rws,
+    x="time",
+    y="value",
+    hue="variable",
+    palette=[da.color[0], da.color[1], da.color[2], da.color[3], da.color[4]],
+    linewidth=1.5,  
+    legend=False,   
+)
+
+plt.xlabel("Time period")
+plt.ylabel("Value of the simulated variable")
+plt.xlim(-3, 103)
+plt.xticks(ticks=da.seq(0, 100, 10)) 
+plt.show()
+```
+
+### PART 2
+
+Serially uncorrelated vs serially correlated series
+
+Simulation exercies:
+  1. generate white noises (uncorrelated series)
+  2. generate serially correlated series with rho=0.8 from white noise
+
+```{python}
+rng = np.random.default_rng(1000)
+
+white_noise = rng.normal(0, 1, T)
+
+rho = 0.8
+serially_correlated = np.zeros(T)
+serially_correlated[0] = white_noise[0]
+
+for i in range(1, len(serially_correlated)):
+    serially_correlated[i] = rho * serially_correlated[i - 1] + white_noise[i]
+```
+
+```{python}
+series_simulation_data = pd.DataFrame(
+    [white_noise, serially_correlated],
+    index=["white_noise", "corr_08"],
+).T
+series_simulation_data["time"] = series_simulation_data.index + 1
+series_simulation_data
+```
+
+Whitenoise
+
+```{python}
+sns.lineplot(
+    data=series_simulation_data,
+    x="time",
+    y="white_noise",
+    color=da.color[0],
+    linewidth=1.5
+)
+plt.axhline(y=0, color=da.color[1], linewidth=1.5)
+plt.xlabel("Time period")
+plt.ylabel("Value of the simulated variable")
+plt.xlim(series_simulation_data["time"].min()-1, series_simulation_data["time"].max()+1)
+plt.xticks(ticks=da.seq(0, 100, 10)) 
+plt.show()
+```
+
+Serially correlated series, rho=0.8
+
+```{python}
+sns.lineplot(
+    data=series_simulation_data,
+    x="time",
+    y="corr_08",
+    color=da.color[0],
+    linewidth=1.5
+)
+plt.axhline(y=0, color=da.color[1], linewidth=1.5)
+plt.xlabel("Time period")
+plt.ylabel("Value of the simulated variable")
+plt.xlim(series_simulation_data["time"].min()-1, series_simulation_data["time"].max()+1)
+plt.xticks(ticks=da.seq(0, 100, 10)) 
+plt.show()
+```
+
+Two series on one plot -  not in book
+
+```{python}
+melted_data = series_simulation_data.melt(id_vars="time")
+```
+
+```{python}
+
+sns.lineplot(
+    data=melted_data,
+    x="time",
+    y="value",
+    hue="variable",
+    palette=[da.color[2], da.color[0]], 
+    linewidth=1.5, 
+)
+
+plt.axhline(y=0, color=da.color[1], linewidth=1.5)
+plt.xlabel("Time period")
+plt.ylabel("Value of the simulated variable")
+
+legend_labels = ["White noise",f"Serial correlation, rho={rho}"]
+handles, _ = plt.gca().get_legend_handles_labels()
+plt.legend(handles=handles, labels=legend_labels, title="")  
+plt.xticks(ticks=da.seq(0, 100, 10))  
+plt.show()
+```
+
+

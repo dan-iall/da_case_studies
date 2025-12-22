@@ -1,0 +1,348 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 19
+**CH19A Food and health prepare**
+
+using the food-health dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/food-health/clean/"
+data_out = dirname + "da_case_studies/ch19-food-health"
+output = dirname + "da_case_studies/ch19-food-health/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+```
+
+### PART I. FEATURE ENGINEERING ––> VARIABLES FOR THE EXERCISE
+
+```{python}
+data = pd.read_stata(data_in + "food_dataset_pers_extended_09-11-13.dta")
+#data = pd.read_stata("https://osf.io/download/3c9gq/")
+```
+
+### Food
+
+```{python}
+veggies = [
+    "other_vegetable",
+    "collard_greens",
+    "dandelion_greens",
+    "romaine_lettuce",
+    "generic_greens",
+    "kale",
+    "mustard_greens",
+    "spinach",
+    "turnip_greens",
+    "broccoli",
+    "dark_green_vegetable_soup",
+    "carrots",
+    "pumpkin",
+    "sweet_potato",
+    "squash",
+    "tomato",
+    "sprouts",
+    "artichoke",
+    "asparagus",
+    "green_beans",
+    "beets",
+    "brussels_sprouts",
+    "cabbage",
+    "cauliflower",
+    "celery",
+    "corn",
+    "cucumber",
+    "eggplant",
+    "lettuce",
+    "arugula",
+    "mushrooms",
+    "onions",
+    "peas",
+    "peppers",
+    "radish",
+    "snow_peas",
+]
+
+fruits = [
+    "grapefruit",
+    "lemon",
+    "orange",
+    "apple",
+    "applesauce",
+    "apricot",
+    "avocado",
+    "banana",
+    "cantaloupe",
+    "cherries",
+    "other_fruit",
+    "grapes",
+    "guava",
+    "kiwi",
+    "honeydew",
+    "mango",
+    "nectarine",
+    "papaya",
+    "peach",
+    "pear",
+    "pineapple",
+    "plum",
+    "watermelon",
+    "blackberries",
+    "blueberries",
+    "cranberries",
+    "raspberries",
+    "strawberries",
+]
+
+beef_all = [
+    "beef",
+    "beef_frozen_meal",
+    "beef_soup",
+    "beef_lean",
+    "beef_with_starch",
+    "beef_with_starch_vegetable",
+    "beef_with_vegetable",
+]
+
+red_meat_all = [
+    "beef",
+    "beef_frozen_meal",
+    "beef_soup",
+    "beef_lean",
+    "beef_with_starch",
+    "beef_with_starch_vegetable",
+    "beef_with_vegetable",
+    "pork",
+    "pork_lean",
+    "pork_soup",
+    "pork_with_starch",
+    "pork_with_starch_vegetable",
+    "pork_with_vegetable",
+    "lamb",
+    "lamb_lean",
+]
+
+nuts = ["almonds", "cashews", "nuts_other"]
+```
+
+```{python}
+data["veggies_n_fruits"] = data[veggies + fruits].sum(axis=1)
+data["veggies_n_fruits_gr"] = data[["gr_" + item for item in veggies + fruits]].sum(
+    axis=1
+)
+data["coffee_espressounit"] = data[["dr1tcaff", "dr2tcaff"]].sum(axis=1) / 120
+data["beef_all"] = data[beef_all].sum(axis=1)
+data["red_meat_all"] = data[red_meat_all].sum(axis=1)
+data["nuts"] = data[nuts].sum(axis=1)
+```
+
+```{python}
+data["veggies_n_fruits"] = data["veggies_n_fruits"].apply(lambda x: 11 if x > 11 else x)
+data["coffee_espressounit"] = data["coffee_espressounit"].apply(
+    lambda x: 15 if x > 12 else x
+)
+```
+
+### SOCIO-ECON, GENDER, AGE
+
+gender, age
+
+```{python}
+data["gender"] = np.where(data["riagendr"] == 1, "male", "female")
+data["age"] = data["ridageyr"]
+data["age2"] = data["ridageyr"] ** 2
+```
+
+```{python}
+data = data.query("age>=18").reset_index(drop=True)
+```
+
+```{python}
+data["age_cut"] = pd.cut(
+    data["age"],
+    bins=[18, 30, 40, 50, 60, 70, 81],
+    labels=[
+        "aged 18-29",
+        "aged 30-39",
+        "aged 40-49",
+        "aged 50-59",
+        "aged 60-69",
+        "aged 70+",
+    ],
+)
+```
+
+socio-economic
+
+```{python}
+data["race"] = data["ridreth1"]
+
+data["married"] = (data["dmdmartl"] == 1) | (data["dmdmartl"] == 6)
+
+data["edu"] = np.where(data["dmdeduc2"] > 5, None, data["dmdeduc2"])
+
+data["hh_size"] = data["dmdhhsiz"]
+
+data["hh_income"] = data["indhhin2"]
+data.loc[data["hh_income"] == 12, "hh_income"] = 6
+data.loc[data["hh_income"] == 13, "hh_income"] = 4
+data.loc[data["hh_income"] == 14, "hh_income"] = 12
+data.loc[data["hh_income"] == 15, "hh_income"] = 13
+data.loc[data["hh_income"] > 15, "hh_income"] = None
+```
+
+```{python}
+hh_income_usd_recode = {
+    1: 2500,
+    2: 7500,
+    3: 12500,
+    4: 17500,
+    5: 22500,
+    6: 30000,
+    7: 40000,
+    8: 50000,
+    9: 60000,
+    10: 70000,
+    12: 30000,
+    13: 10000,
+    14: 85000,
+    15: 150000,
+    77: 40000,
+    99: 40000,
+}
+
+data["hh_income_usd"] = data["indhhin2"].map(hh_income_usd_recode)
+```
+
+```{python}
+data["hh_income_percap"] = data["hh_income_usd"] / data["hh_size"]
+```
+
+prep for regression
+
+```{python}
+# prep for regressions
+
+data["ln_hh_income_percap"] = np.log(data["hh_income_percap"])
+data["income_cat"] = pd.cut(
+    data["hh_income_percap"],
+    bins=[1000, 10000, 30000, 150000],
+    labels=["low", "mid", "high"],
+)
+data["work_occupation"] = data["ocd241"]
+data["work_type"] = data["ocd150"]
+data["work_hs"] = data["ocq180"]
+data.loc[data["work_hs"] > 150, "work_hs"] = None
+data.loc[data["work_hs"] > 100, "work_hs"] = 100
+```
+
+### HEALTH OUTCOMES
+
+```{python}
+# sport
+data["sport_days"] = data["paq655"].fillna(0)
+data["walk_cycle_days"] = data["paq640"].fillna(0)
+```
+
+```{python}
+# smoke
+data["smoker"] = (data["smq040"] == 1) | (data["smq040"] == 2)
+```
+
+```{python}
+# sleep
+data["sleep_hs"] = data["sld010h"]
+data["bp_systolic"] = data["bpxsy1"]
+data["bp_diastolic"] = data["bpxdi1"]
+data["total_cholesterol"] = data["lbdhdd"]
+data["hdl"] = data["lbxtc"]
+data["weight"] = data["bmxwt"]
+data["height"] = data["bmxht"]
+data["ldl"] = data["lbxtc"] - data["lbdhdd"]
+
+data.loc[data["ldl"] < 60, "ldl"] = 60
+data.loc[data["ldl"] > 250, "ldl"] = 250
+```
+
+```{python}
+# BMI and normal weight variables
+
+data["bmi"] = 10000 * data["weight"] / (data["height"] ** 2)
+data["normal_weight"] = np.where(data["bmi"] < 25, 1, 0)
+```
+
+```{python}
+# Blood pressure variables
+
+data.loc[data["bp_systolic"] == 0, "bp_systolic"] = None
+data.loc[data["bp_systolic"] < 85, "bp_systolic"] = 85
+data.loc[data["bp_systolic"] > 200, "bp_systolic"] = 200
+
+data.loc[data["bp_diastolic"] == 0, "bp_diastolic"] = None
+data.loc[data["bp_diastolic"] < 40, "bp_diastolic"] = 40
+data.loc[data["bp_diastolic"] > 100, "bp_diastolic"] = 100
+```
+
+```{python}
+# gabor's score
+
+data["blood_pressure"] = data["bp_systolic"] + data["bp_diastolic"]
+```
+
+```{python}
+# heart health
+
+data["heart_risk"] = data["ldl"] + data["blood_pressure"]
+```
+
+```{python}
+data = data.drop(
+    ["sld010h", "bpxsy1", "bpxdi1", "lbxtc", "lbdhdd", "bmxwt", "bmxht", "dmdmartl"],
+    axis=1,
+)
+```
+
+___
+
+```{python}
+data.to_csv(data_in + "food-health.csv", index=False)
+```
+

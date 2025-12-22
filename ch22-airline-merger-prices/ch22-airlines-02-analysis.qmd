@@ -1,0 +1,530 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### CHAPTER 22
+**CH22A How does a merger between airlines affect prices?**
+
+ using the airline-tickets-usa dataset
+ 
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pyfixest as pf
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/airline-tickets-usa/clean/"
+data_out = dirname + "da_case_studies/ch22-airline-merger-prices/"
+output = dirname + "da_case_studies/ch22-airline-merger-prices/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+# I.  Examining pre-treatment trends in avg ln price
+
+workfile to identify treated and untreated markets
+
+```{python}
+# !!! make sure you have run ch22-airlines-01-dataprep.ipynb before
+data_work = pd.read_pickle(data_out + "ch22-airline-workfile.pkl").loc[
+    lambda x: (x["balanced"] == 1) & (x["year"] == 2011)
+][["origin", "finaldest", "return", "treated", "smallmkt"]]
+```
+
+use year-quarter panel data and merge to it treated-untreated 
+
+(keep matched ones; no unmatched from "using")
+
+```{python}
+data = pd.read_stata(data_in + "originfinal-panel.dta")
+#data = pd.read_stata("https://osf.io/download/y3dfk/")
+
+data = pd.merge(data, data_work, on=["origin", "finaldest", "return"])
+```
+
+aggreagete data to create average price by treated-untreated and year-quarter and draw time series graphs of log avg price all markets
+
+```{python}
+weighted_avg = lambda x: np.average(x, weights=data.loc[x.index, "passengers"])
+```
+
+```{python}
+data_agg = (
+    data.groupby(["treated", "year", "quarter"])
+    .agg(avgprice=("avgprice", weighted_avg))
+    .reset_index()
+)
+
+data_agg["lnavgprice"] = np.log(data_agg["avgprice"])
+```
+
+```{python}
+# Create the 'quarters' column as before
+data_agg["quarters"] = (
+    data_agg["year"].astype(str) + "Q" + data_agg["quarter"].astype(str)
+)
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+# Line plot for treated and untreated groups
+sns.lineplot(
+    data=pd.concat([pd.Series("2010Q1", name="quarters"), data_agg]),
+    x="quarters",
+    y="lnavgprice",
+    hue="treated",
+    linewidth=2,
+    ax=ax,
+)
+
+# Add vertical lines for key events
+ax.axvline(x="2012Q1", color=da.color[2], linestyle="--", linewidth=2)
+ax.axvline(x="2015Q3", color=da.color[2], linestyle="--", linewidth=2)
+
+# Annotate the plot
+ax.text("2013Q1", 5.14, "Treated markets", color=da.color[1], fontsize=10, ha="center")
+ax.text("2013Q1", 5.44, "Untreated markets", color=da.color[0], fontsize=10, ha="center")
+
+ax.text("2011Q2", 5.55, "Announcement", color=da.color[2], fontsize=10, ha="center")
+ax.text("2014Q3", 5.55, "Merger happens", color=da.color[2], fontsize=10, ha="center")
+
+# Customize the x-axis and y-axis limits, ticks, and labels and remove the legend
+ax.set_xticks(["2010Q1", "2012Q1", "2014Q1", "2016Q1"])
+ax.set_ylim(4.98, 5.62)
+ax.tick_params(axis="y", labelsize=9)
+ax.set_ylabel("ln(average price)", fontsize=9)
+ax.set_xlabel("", fontsize=9)
+ax.legend_.remove()
+da.add_margin(ax, x=-0.01, y=0)
+plt.show()
+```
+
+**Small markets**
+
+```{python}
+data_agg = (
+    data.query("smallmkt == 1")
+    .groupby(["treated", "year", "quarter"])
+    .agg(avgprice=("avgprice", weighted_avg))
+    .reset_index()
+)
+
+data_agg["lnavgprice"] = np.log(data_agg["avgprice"])
+data_agg["quarters"] = (
+    data_agg["year"].astype(str) + "Q" + data_agg["quarter"].astype(str)
+)
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+# Line plot for treated and untreated groups
+sns.lineplot(
+    data=pd.concat([pd.Series("2010Q1", name="quarters"), data_agg]),
+    x="quarters",
+    y="lnavgprice",
+    hue="treated",
+    linewidth=2,
+    ax=ax,
+)
+
+# Add vertical lines for key events
+ax.axvline(x="2012Q1", color=da.color[2], linestyle="--", linewidth=2)
+ax.axvline(x="2015Q3", color=da.color[2], linestyle="--", linewidth=2)
+
+# Annotate the plot
+ax.text("2013Q1", 5.4, "Treated markets", color=da.color[1], fontsize=10, ha="center")
+ax.text("2013Q1", 5.6, "Untreated markets", color=da.color[0], fontsize=10, ha="center")
+
+# Customize the x-axis and y-axis limits, ticks, and labels and remove the legend
+ax.set_xticks(["2010Q1", "2012Q1", "2014Q1", "2016Q1"])
+ax.set_ylim(5.25, 5.67)
+ax.tick_params(axis="y", labelsize=9)
+ax.set_ylabel("ln(average price)", fontsize=9)
+ax.set_xlabel("", fontsize=9)
+ax.legend_.remove()
+da.add_margin(ax, x=-0.01, y=0)
+plt.show()
+```
+
+**Large markets**
+
+```{python}
+data_agg = (
+    data.query("smallmkt == 0")
+    .groupby(["treated", "year", "quarter"])
+    .agg(avgprice=("avgprice", weighted_avg))
+    .reset_index()
+)
+
+data_agg["lnavgprice"] = np.log(data_agg["avgprice"])
+data_agg["quarters"] = (
+    data_agg["year"].astype(str) + "Q" + data_agg["quarter"].astype(str)
+)
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+# Line plot for treated and untreated groups
+sns.lineplot(
+    data=pd.concat([pd.Series("2010Q1", name="quarters"), data_agg]),
+    x="quarters",
+    y="lnavgprice",
+    hue="treated",
+    linewidth=2,
+    ax=ax,
+)
+
+# Add vertical lines for key events
+ax.axvline(x="2012Q1", color=da.color[2], linestyle="--", linewidth=2)
+ax.axvline(x="2015Q3", color=da.color[2], linestyle="--", linewidth=2)
+
+# Annotate the plot
+ax.text("2013Q1", 4.9, "Treated markets", color=da.color[1], fontsize=10, ha="center")
+ax.text("2013Q1", 4.3, "Untreated markets", color=da.color[0], fontsize=10, ha="center")
+
+# Customize the x-axis and y-axis limits, ticks, and labels and remove the legend
+ax.set_xticks(["2010Q1", "2012Q1", "2014Q1", "2016Q1"])
+ax.set_ylim(3.75, 5.1)
+ax.set_yticks([3.75, 4, 4.25, 4.5, 4.75, 5])
+ax.tick_params(axis="y", labelsize=9)
+ax.set_ylabel("ln(average price)", fontsize=9)
+ax.set_xlabel("", fontsize=9)
+ax.legend_.remove()
+da.add_margin(ax, x=-0.01, y=0)
+plt.show()
+```
+
+# II. ANALYSIS
+
+```{python}
+# reload main file
+data_agg = pd.read_pickle(data_out + "ch22-airline-workfile.pkl")
+# keep balanced
+data_balanced = data_agg.query("balanced == 1")
+```
+
+**Basic diff-in-diffs regression, weighted by # passengers on market, in before period**
+
+```{python}
+fd = pf.feols("d_lnavgp ~ treated", data_balanced, weights="pass_bef", vcov="hetero")
+fd_small = pf.feols(
+    "d_lnavgp ~ treated",
+    data_balanced.loc[lambda x: x["smallmkt"] == 1],
+    weights="pass_bef",
+    vcov="hetero",
+)
+fd_large = pf.feols(
+    "d_lnavgp ~ treated",
+    data_balanced.loc[lambda x: x["smallmkt"] == 0],
+    weights="pass_bef",
+    vcov="hetero",
+)
+```
+
+### Table 22.2 Basic difference-in-differences estimate of the effect of the AA–US merger on log prices
+
+```{python}
+pf.etable(
+    [fd, fd_small, fd_large],
+    model_heads=["All markest", "Small markets", "Large markets"],
+    head_order="h",
+    show_se_type=False,
+    labels={"Intercept": "Constant", "treated[T.True]": "AAUS<sub>before</sub>"},
+    digits=2,
+)
+```
+
+### Table 22.3 Difference-in-differences table for the effect of AA–US merger on log prices
+
+```{python}
+did_table = (
+    data_balanced.loc[data_balanced["lnavgp"].notnull()]
+    .assign(treated_label=lambda x: np.where(x["treated"], "Treated", "Untreated"))
+    .assign(after_label=lambda x: np.where(x["after"], "After", "Before"))
+    .groupby(["after_label", "treated_label"])
+    .apply(lambda x: np.average(x["lnavgp"], weights=x["pass_bef"]))
+    .unstack(1)
+    .sort_index(ascending=False)
+    .rename_axis("", axis=0)
+    .rename_axis("", axis=1)
+)
+
+did_table["Difference: Treated − Untreated"] = (
+    did_table["Treated"] - did_table["Untreated"]
+)
+did_table = pd.concat(
+    [
+        did_table,
+        did_table.diff().iloc[-1, :].rename("Difference: After – Before").to_frame().T,
+    ],
+    axis=0,
+)
+
+did_table.round(2)
+```
+
+**Diff-in-diffs regression with confounder variables weighted by # passengers on market, in before period**
+
+```{python}
+data_balanced = data_balanced.merge(
+    data_balanced.loc[lambda x: x["before"] == 1]
+    .assign(
+        lnpass=lambda x: np.log(x["passengers"]),
+        sum_shares_bef=lambda x: x["shareAA"] + x["shareUS"],
+    )
+    .groupby("market")
+    .agg(
+        lnpass_bef=("lnpass", np.nanmean),
+        share_bef=("sum_shares_bef", np.nanmean),
+        sharelarge_bef=("sharelargest", np.nanmean),
+    )
+    .reset_index(),
+    on="market",
+)
+```
+
+```{python}
+data_balanced = data_balanced.rename(columns={"return": "return_"})
+```
+
+```{python}
+formula2 = "d_lnavgp ~ treated + lnpass_bef + return_ + stops + sharelarge_bef"
+fd2 = pf.feols(formula2, data_balanced, weights="pass_bef", vcov="HC1")
+fd2_small = pf.feols(
+    formula2,
+    data_balanced.loc[lambda x: x["smallmkt"] == 1],
+    weights="pass_bef",
+    vcov="HC1",
+)
+fd2_large = pf.feols(
+    formula2,
+    data_balanced.loc[lambda x: x["smallmkt"] == 0],
+    weights="pass_bef",
+    vcov="HC1",
+)
+```
+
+### Table 22.4 Difference-in-differences estimates of the effect of AA–US merger on log prices, conditioning on confounder variables
+
+```{python}
+pf.etable(
+    [fd2, fd2_small, fd2_large],
+    model_heads=["All markest", "Small markets", "Large markets"],
+    head_order="h",
+    show_se_type=False,
+    labels={
+        "Intercept": "Constant",
+        "treated[T.True]": "AAUS<sub>before</sub>",
+        "lnpass_bef": "ln no. passengers<sub>before</sub>",
+        "return_": "Return route",
+        "stops": "Number of stops",
+        "sharelarge_bef": "Share of largest carrier",
+    },
+    digits=2,
+)
+```
+
+**Diff-in-diffs regerssion with quantitative treatment weighted by # passengers on market, in before period**
+
+```{python}
+share_bef_1 = np.where(data_balanced.query("before == 1")["share_bef"] == 1, 1, 0)
+share_bef_0 = np.where(data_balanced.query("before == 1")["share_bef"] == 0, 1, 0)
+```
+
+```{python}
+data_balanced.query("before == 1").groupby([share_bef_0, share_bef_1]).agg(
+    sum=("passengers", sum), mean=("passengers", "mean"), n=("passengers", "count")
+)  # bit different from R
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+sns.histplot(
+    data=data_balanced,
+    x="share_bef",
+    weights="pass_bef",
+    binwidth=0.05,
+    linewidth=1,
+    alpha=0.9,
+    stat="percent",
+    ax=ax,
+)
+
+# Customize x-axis
+ax.set_xlim(0, 1)
+ax.set_xticks(np.arange(0, 1.25, 0.25))
+ax.set_xlabel("Market share of AA and US combined, at baseline")
+
+ax.set_ylim(0, 50)
+ax.set_yticklabels([f"{int(t)}%" for t in ax.get_yticks()])  # Percent format
+ax.set_ylabel("Percent")
+da.add_margin(ax, x=0.01, y=0)
+plt.show()
+```
+
+```{python}
+formula3 = "d_lnavgp ~ share_bef + lnpass_bef + return_ + stops + sharelarge_bef"
+fd3 = pf.feols(formula3, data_balanced, weights="pass_bef", vcov="hetero")
+fd3_small = pf.feols(
+    formula3,
+    data_balanced.loc[lambda x: x["smallmkt"] == 1],
+    weights="pass_bef",
+    vcov="hetero",
+)
+fd3_large = pf.feols(
+    formula3,
+    data_balanced.loc[lambda x: x["smallmkt"] == 0],
+    weights="pass_bef",
+    vcov="hetero",
+)
+```
+
+### Table 22.5 Difference-in-differences estimates of the effect of AA–US merger on average log prices. Treatment is the combined market share of the two airlines at baseline
+
+```{python}
+pf.etable(
+    [fd3, fd3_small, fd3_large],
+    model_heads=["All markest", "Small markets", "Large markets"],
+    head_order="h",
+    show_se_type=False,
+    labels={
+        "Intercept": "Constant",
+        "treated[T.True]": "AAUS<sub>before</sub>",
+        "lnpass_bef": "ln no. passengers<sub>before</sub>",
+        "return_": "Return route",
+        "stops": "Number of stops",
+        "sharelarge_bef": "Share of largest carrier",
+    },
+    digits=2,
+)
+```
+
+**Diff-in-diffs on pooled cross-sections regression**
+* use entire unbalanced panel
+* errr... after only is dropped here see later
+* weighted by # passengers on market, in before period
+
+```{python}
+data_agg = data_agg.merge(
+    data_agg.loc[lambda x: x["before"] == 1]
+    .assign(lnpass_bef=lambda x: np.log(x["passengers"]))
+    .groupby("market")
+    .agg(
+        lnpass_bef=("lnpass_bef", np.nanmean),
+        sharelarge_bef=("sharelargest", np.nanmean),
+    )
+    .reset_index(),
+    on="market",
+    how="left",
+)
+```
+
+```{python}
+data_agg.groupby(["balanced", "before"]).agg({"passengers": ["sum", "count"]})
+```
+
+```{python}
+# treatment group defined if observed before only or both before and after
+```
+
+```{python}
+data_agg = data_agg.merge(
+    data_agg.loc[lambda x: x["before"] == 1]
+    .groupby("market")
+    .agg(treatment=("AA_and_US", np.nanmean))
+    .reset_index(),
+    on="market",
+)
+```
+
+```{python}
+data_agg["treatment_isna"] = data_agg["treatment"].isna()
+data_agg.groupby(["treatment_isna", "balanced"]).agg({"passengers": ["sum", "count"]})
+```
+
+```{python}
+data_agg = data_agg.rename(columns={"return": "return_"})
+```
+
+```{python}
+# conditioning on observed confounders
+formula4 = "lnavgp ~ (treatment + lnpass_bef + return_ + stops + sharelarge_bef)*after"
+
+fd4 = pf.feols(formula4, data_agg, weights="pass_bef", vcov="hetero")
+fd4_small = pf.feols(
+    formula4,
+    data_agg.loc[lambda x: x["smallmkt"] == 1],
+    weights="pass_bef",
+    vcov="hetero",
+)
+fd4_large = pf.feols(
+    formula4,
+    data_agg.loc[lambda x: x["smallmkt"] == 0],
+    weights="pass_bef",
+    vcov="hetero",
+)
+```
+
+### Table 22.6 Difference-in-differences estimates of the effect of AA–US merger on log prices. Pooled crosssections
+
+```{python}
+pf.etable(
+    [fd4, fd4_small, fd4_large],
+    model_heads=["All markest", "Small markets", "Large markets"],
+    head_order="h",
+    show_se_type=False,
+    labels={
+        "Intercept": "Constant",
+        "treatment": "AAUS<sub>before</sub>",
+        "lnpass_bef": "ln no. passengers<sub>before</sub>",
+        "return_": "Return route",
+        "stops": "Number of stops",
+        "sharelarge_bef": "Share of largest carrier",
+    },
+    digits=2,
+)
+```
+
+

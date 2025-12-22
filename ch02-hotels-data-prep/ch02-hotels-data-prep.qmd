@@ -1,0 +1,439 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 02
+**CH02A Finding a good deal among hotels: data preparation**
+
+using the hotels-vienna dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import pandas as pd
+
+#warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/hotels-vienna"
+data_out = dirname + "da_case_studies/ch02-hotels-data-prep/"
+output = dirname + "da_case_studies/ch02-hotels-data-prep/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+```
+
+```{python}
+# we'll use both clean and raw files in this case study
+# separate data_in directpories for these two
+#  same for options 1 and 2 (once you have set $data_in)
+data_in_clean = data_in + "/clean/"
+data_in_raw =data_in + "/raw/"
+```
+
+### Read data
+
+```{python}
+# load in clean and tidy data and create workfile
+data = pd.read_csv(data_in_clean + "hotels-vienna.csv")
+#data = pd.read_csv("https://osf.io/y6jvb/download")
+```
+
+```{python}
+data = data[
+    [
+        "hotel_id",
+        "accommodation_type",
+        "distance",
+        "stars",
+        "rating",
+        "rating_count",
+        "price",
+    ]
+]
+```
+
+```{python}
+# look at accomodation types
+data["accommodation_type"].value_counts(dropna=False)
+```
+
+**********************************************
+### Table 1.1
+**********************************************
+
+```{python}
+data.head()
+```
+
+**********************************************
+### Table 2.2
+**********************************************
+
+```{python}
+# data types stored in the data file 
+# different way of "type", than in the book
+data.dtypes
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** To enforce "Data Strictness" early. We convert generic, memory-heavy text into efficient categories and ensure that missing ratings don't crash our calculations by using nullable integers.
+
+**The Syntax Anatomy:**
+* `data` → **The Subject** (Our raw dataframe)
+* `.astype()` → **The Verb** (Force-casting data types)
+* `{ 'column': 'type' }` → **The Settings** (The mapping of specific columns to their target technical formats)
+
+> **💡 The Wisdom Check:**
+> distinct between `int64` (lower case) and `Int64` (capitalized). The lower-case version cannot handle `NaN` (missing values) and will throw errors. The Capitalized version is "Nullable" and safe for real-world, dirty data.
+
+```{python}
+data = data.astype(
+    {
+        'accommodation_type': 'category',  # Optimize memory for repeating labels
+        'rating_count': 'Int64',  # Whole numbers only, allowing for NaNs
+        'hotel_id': 'str',  # IDs are labels, not math subjects
+    }
+)
+# Verify the cleanup
+data.dtypes
+```
+
+```{python}
+data.iloc[1]
+```
+
+**********************************************
+### Table 2.3
+**********************************************
+
+```{python}
+data = data.loc[data["accommodation_type"] == "Hotel"]
+```
+
+#### 📏 THE DIMENSIONS CHEATSHEET
+
+**1. Total Dimensions (Tuple) -> (Rows, Columns)**
+*Use when: Checking the "Area" of the data.*
+`data.shape`       # Output: (264, 8)
+
+**2. Just the Count (Rows) -> Inventory Level**
+*Use when: "N" count for stats or checking filter impact.*
+`data.shape[0]`    # Output: 264
+`len(data)`        # Output: 264 (Faster shorthand)
+
+**3. Just the Width (Columns) -> Feature Count**
+*Use when: Checking if a merge added new variables.*
+`data.shape[1]`    # Output: 8
+
+```{python}
+data.shape[0]
+```
+
+```{python}
+data[["hotel_id","price","distance"]].head(3)
+```
+
+## PART B: repeat part of the cleaning code
+using the raw csv data file
+ includes some additional output
+*********************************************************
+
+*IMPORT AND PREPARE DATA*
+
+variables downoaded as string, often in form that is not helpful
+need to transform then to numbers that we can use
+
+```{python}
+data = pd.read_csv(data_in_raw + "hotelbookingdata-vienna.csv")
+#data = pd.read_csv( "https://osf.io/g5dmw/download" )
+data.head()
+```
+
+```{python}
+# # distance to center entered as string in miles with one decimal
+# data["distance"] = data["center1distance"].str.split(" ").apply(lambda x: float(x[0]))
+# data["distance_alter"] = (
+#     data["center2distance"].str.split(" ").apply(lambda x: float(x[0]))
+# )
+```
+
+```{python}
+# The Fast Way (Vectorized)
+data["distance"] = (
+    data["center1distance"]
+    .str.split()      # 1. Splits on whitespace (returns a series of lists)
+    .str[0]           # 2. Vectorized grab of the first element
+    .astype(float)    # 3. Mass convert to float
+)
+```
+
+```{python}
+# data["accommodation_type"] = (
+#     data["accommodationtype"].str.split("@").apply(lambda x: x[1]).str.strip()
+# )
+```
+
+```{python}
+# The Fast Way
+data["accommodation_type"] = (
+    data["accommodationtype"]
+    .str.split("@")   # 1. Split into lists
+    .str[1]           # 2. Vectorized grab of the second item (index 1)
+    .str.strip()      # 3. Clean up whitespace
+)
+```
+
+```{python}
+data.head()
+```
+
+```{python}
+data["nnight"] = data["price_night"].str.split(" ").apply(lambda x: int(x[2]))
+```
+
+```{python}
+# # generate numerical variable of rating variable from string variable
+# data["rating"] = (
+#     data["guestreviewsrating"]
+#     .str.split(" ")
+#     .apply(lambda x: float(x[0]) if type(x) == list else None)
+# )
+```
+
+```{python}
+# The Fast Way
+data["rating"] = (
+    data["guestreviewsrating"]
+    .str.split(" ")   # 1. Split into lists
+    .str[0]           # 2. Grab the first chunk ("4.5" from "4.5 / 5")
+    .astype(float)    # 3. Convert to number
+)
+```
+
+```{python}
+# check: frequency table of all values incl. missing varlues
+da.tabulate(data["rating"])
+```
+
+```{python}
+# check: frequency table of all values incl. missing varlues
+da.tabulate(data["rating_reviewcount"])
+```
+
+```{python}
+data["rating_count"] = data["rating_reviewcount"].apply(float)
+data["rating_count"].describe().to_frame().T
+```
+
+*RENAME VARIABLES*
+
+```{python}
+data = data.rename(
+    columns={
+        "rating2_ta": "ratingta",
+        "rating2_ta_reviewcount": "ratingta_count",
+        "addresscountryname": "country",
+        "s_city": "city",
+        "starrating": "stars",
+    }
+)
+```
+
+```{python}
+# # ---------------------------------------------------------
+# #  THE SPELL: da.tabulate()
+# # ---------------------------------------------------------
+# #import py_helper_functions as da
+
+# # 1. The Basic Usage (Default)
+# # Best for: Discrete categories (e.g., "Red", "Blue") or Integers (1, 2, 3)
+# # Behavior: Keeps NaN values by default so you see missing data.
+# da.tabulate(data["column_name"])
+
+# # 2. The "Clean" Usage (Drop NaNs)
+# # Best for: When you only care about valid data points.
+# da.tabulate(data["column_name"], drop_missing=True)
+
+# # 3. The "Continuous Data" Hack
+# # Best for: Prices, exact ratings (4.2), or anything with decimals.
+# # Gotcha: You MUST round or bin continuous data first, or the table will be huge.
+# da.tabulate(data["price"].round(-1)) # Round to nearest 10
+# # OR
+# da.tabulate(pd.cut(data["price"], bins=5)) # Create 5 equal bins
+
+# # ---------------------------------------------------------
+# #  OUTPUT COLUMNS EXPLAINED
+# # ---------------------------------------------------------
+# # Freq. : How many times this value appears (Raw Count)
+# # Perc. : The portion of the total this value represents (Probability Mass)
+# # Cum.  : Running total of Perc. (Cumulative Distribution)
+# # Index : The values themselves, sorted logically (Low -> High)
+
+
+
+# # look at key variables
+# da.tabulate(data["stars"])
+```
+
+```{python}
+da.tabulate(data["rating"],drop_missing=True)
+```
+
+```{python}
+data = data.drop(
+    columns=[
+        "center2distance",
+        "center1distance",
+        "price_night",
+        "guestreviewsrating",
+        "rating_reviewcount",
+    ]
+)
+```
+
+**********************************************
+### Table 2.10
+**********************************************
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** Detect data quality issues by isolating hotel entities that appear multiple times in our dataset. We must view *all* instances to determine if they are redundant duplicates or conflicting data points.
+
+**The Syntax Anatomy:**
+* `sort_values(by=...)` → **The Prep**: Groups identical IDs together visually for easier human inspection.
+* `duplicated(keep=False)` → **The Dragnet**: The critical setting. Instead of hiding the original, it marks **ALL** occurrences (original + copies) as `True` so we can compare them side-by-side.
+* `[[list_of_cols]]` → **The Lens**: Restricts our view to only the "vital signs" (price, stars) needed to make a decision on which record to keep.
+
+> **💡 The Wisdom Check:**
+> Never use generic methods blindly. Default `duplicated()` hides the problem (the original row). Using `keep=False` is the only way to perform a true audit of the conflict.
+
+```{python}
+# Look for perfect duplicates
+data = data.sort_values(by=["hotel_id"])
+data[data["hotel_id"].duplicated(keep=False)][
+    [
+        "hotel_id",
+        "accommodation_type",
+        "price",
+        "distance",
+        "stars",
+        "rating",
+        "rating_count",
+    ]
+]
+```
+
+```{python}
+# drop the duplicate values
+data = data.drop_duplicates()
+```
+
+**********************************************
+### Missing values in text
+***********************************************
+
+ ### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** Perform a rapid "Health Check" on all numerical variables. We need to instantly spot outliers (strange Max values), missing data (low Counts), or weird distributions (Mean vs. Median) without scrolling horizontally.
+
+**The Syntax Anatomy:**
+* `describe()` → **The Calculator**: Generates the standard summary statistics (Count, Mean, Std Dev, Min/Max, Percentiles).
+* `transpose()` → **The Pivot**: Flips the table so variables are rows and stats are columns.
+
+> **💡 The Wisdom Check:**
+> Always Transpose. Humans read lists from Top-to-Bottom better than Left-to-Right. If your dataset has 50 columns, `describe()` without `transpose()` is unreadable.
+
+```{python}
+# data.describe().transpose()
+data.describe().T
+```
+
+```{python}
+print(data['rating'].isnull().sum())
+data['misrating'] = data['rating'].isnull()
+# we cant use data.describe(include='all').T because it have false when rating wasnt null
+```
+
+```{python}
+da.tabulate(data["misrating"])
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** Check for **Systematic Bias**. We suspect missing ratings aren't random accidents. This table reveals if specific business segments (like 'Apartments') are disproportionately responsible for the missing data.
+
+**The Syntax Anatomy:**
+* `pd.crosstab(row, col)` → **The Matrix**: Counts the intersection of two categorical variables.
+* `row` (Accom Type) vs `col` (Misrating) → **The X-Ray**: Breaks down our missing data flag by business category.
+* `margins=True` → **The Context**: Adds "All" (Subtotals). Without this, we can't calculate percentages or judge the severity of the count.
+
+> **💡 The Wisdom Check:**
+> Absolute numbers lie. "100 missing values" sounds the same as "100 missing values." But 100 out of 200 (50%) vs. 100 out of 1,000,000 (0.01%) are completely different business problems. Always use `margins=True`.
+
+```{python}
+pd.crosstab(data['accommodation_type'], data['misrating'], margins=True)
+```
+
+### 🕵️‍♀️ Bellonda's Logic Decoder
+**The Business Goal:** value-based Impact Analysis. We know *where* data is missing (frequency), now we check if it affects *Revenue* (Price). We are comparing the average price of labeled vs. unlabeled data to check for "Selection Bias" (e.g., "Cheaper hotels have more missing data").
+
+**The Syntax Anatomy:**
+* `values=` + `aggfunc=` → **The Pivot**: These must always appear together.
+    * `values`: The column containing the numbers we want to crunch (Price).
+    * `aggfunc`: The math operation to apply (Mean/Average).
+* `margins=True` with `mean` → **The Weighted Average**: Be careful! The "All" row here isn't a sum; it is the average price of the entire category.
+
+> **💡 The Wisdom Check:**
+> Defines the difference between a "Data Janitor" and a "Data Scientist." The Janitor counts the missing rows. The Scientist calculates if the missing rows represent a specific economic segment (Budget vs. Luxury).
+
+```{python}
+pd.crosstab(
+    index=data["accommodation_type"],
+    columns=data["misrating"],
+    values=data["price"],
+    aggfunc="mean",
+    margins=True,
+).round(2)
+```
+
+```{python}
+data.loc[
+    (data["misrating"] == 1) & (data["accommodation_type"] == "Hotel"),
+    [
+        "hotel_id",
+        "accommodation_type",
+        "price",
+        "distance",
+        "stars",
+        "rating",
+        "rating_count",
+    ],
+]
+```
+
+

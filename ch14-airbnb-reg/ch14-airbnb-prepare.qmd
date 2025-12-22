@@ -1,0 +1,489 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 14
+**CH14B Predicting AirBnB apartment prices: selecting a regression model**
+
+using the airbnb dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import regex as re
+import statsmodels.formula.api as smf
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/airbnb/clean/"
+data_out = dirname + "da_case_studies/ch14-airbnb-reg/"
+output = dirname + "da_case_studies/ch14-airbnb-reg/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# Import data
+data = pd.read_csv(data_in + "airbnb_london_cleaned_book.csv", index_col=0)
+# data = pd.read_csv("https://osf.io/download/7n96w/", index_col=0)
+
+```
+
+```{python}
+for g in data.columns:
+    if "reviews" in g:
+        print(g)
+```
+
+```{python}
+data.property_type.value_counts()
+```
+
+```{python}
+# Rename roomt type because it is too long
+data = data.loc[data.property_type.isin(["Apartment", "House", "Townhouse"])]
+```
+
+```{python}
+data.property_type = [x if x != "Townhouse" else "House" for x in data.property_type]
+data["f_property_type"] = data["property_type"].astype("category")
+data["f_room_type"] = data["room_type"].astype("category")
+data["f_room_type2"] = (
+    data["f_room_type"]
+    .replace(
+        {
+            "Entire home/apt": "Entire/Apt",
+            "Private room": "Private",
+            "Shared room": "Shared",
+        }
+    )
+    .astype("category")
+)
+```
+
+```{python}
+# cancellation policy as factor
+data.cancellation_policy.value_counts()
+```
+
+```{python}
+data["cancellation_policy"] = [
+    "strict" if x in ("super_strict_30", "super_strict_60") else x
+    for x in data.cancellation_policy
+]
+data["f_cancellation_policy"] = data["cancellation_policy"].astype("category")
+```
+
+```{python}
+data.bed_type.value_counts()
+```
+
+```{python}
+data["bed_type"] = [
+    "Couch" if x in ("Futon", "Pull-out Sofa", "Airbed") else x for x in data.bed_type
+]
+data["f_bed_type"] = data["bed_type"].astype("category")
+data["f_neighbourhood_cleansed"] = data["neighbourhood_cleansed"].astype("category")
+```
+
+```{python}
+## Create Numerical variables
+data["usd_price_day"] = data["price"]
+data["p_host_response_rate"] = data["host_response_rate"].astype("float")
+data = data.rename({"cleaning_fee": "usd_cleaning_fee"}, axis=1)
+```
+
+```{python}
+for column in (
+    "accommodates",
+    "bathrooms",
+    "review_scores_rating",
+    "number_of_reviews",
+    "guests_included",
+    "reviews_per_month",
+    "extra_people",
+    "minimum_nights",
+    "beds",
+):
+    data["n_" + re.sub(r"[^[:alnum:]_]", "", column.lower())] = data[column].astype(
+        "float"
+    )
+```
+
+```{python}
+data["n_days_since"] = pd.to_datetime(
+    data["calendar_last_scraped"], format="%Y-%m-%d"
+) - pd.to_datetime(data["first_review"], format="%Y-%m-%d")
+# Previous row creates a timedelta object in each row. Get the elapsed number of days like:
+data["n_days_since"] = [x.days for x in data["n_days_since"]]
+```
+
+```{python}
+for col in data.columns[71:121]:
+    data["d_" + re.sub(r"[^[:alnum:]_]", "", col.lower())] = data[col].astype(int)
+```
+
+```{python}
+amenities = list(data.filter(regex="^d_.*"))
+len(amenities)
+```
+
+```{python}
+data.filter(regex=("^d_.*|^n_.*|^f_.*|^p_.*|^usd_.*")).columns
+```
+
+```{python}
+# keep columns if contain d_, n_,f_, p_, usd_ and some others
+data = data.filter(regex=("^d_.*|^n_.*|^f_.*|^p_.*|^usd_.*")).join(
+    data[
+        [
+            "price",
+            "id",
+            "neighbourhood_cleansed",
+            "cancellation_policy",
+            "room_type",
+            "property_type",
+        ]
+    ]
+)
+```
+
+```{python}
+# with price info only
+data = data.dropna(subset=["price"])
+```
+
+```{python}
+##################################
+# DESCRIBE
+data = data.loc[data.neighbourhood_cleansed == "Hackney"]
+```
+
+```{python}
+N = data.shape[0]
+N
+```
+
+```{python}
+#####################
+### look at price ###
+#####################
+# data['price']=[x.replace(',','') for x in data['price']]
+data["price"] = data["price"].str.replace(",", "").astype("float")
+```
+
+```{python}
+data.price.describe()
+```
+
+```{python}
+data["ln_price"] = np.log(data.price)
+```
+
+```{python}
+# Remove extreme values + missing from prices (this case: only 3 missing values)
+data = data.loc[data.price < 1000]
+```
+
+```{python}
+sns.histplot(data, x="ln_price", bins=30, alpha=1)
+plt.ylabel("Count")
+plt.xlabel("Log price")
+plt.show()
+```
+
+```{python}
+sns.histplot(data, x="price", bins=30, alpha=1)
+plt.ylabel("Count")
+plt.xlabel("Price")
+plt.show()
+```
+
+```{python}
+################################################
+
+# look at some cnts. key vars, functional form #
+
+################################################
+```
+
+```{python}
+data.groupby("n_accommodates").agg(
+    mean_price=("price", np.mean),
+    min_price=("price", np.min),
+    max_price=("price", np.max),
+    n=("price", "size"),
+)
+```
+
+```{python}
+sns.scatterplot(data=data, x="n_accommodates", y="price", s=15)
+sns.regplot(
+    data=data, x="n_accommodates", y="price", color=da.color[1], scatter=False, ci=None
+)
+plt.ylim(0, 850)
+plt.xlim(0, 15)
+plt.xlabel("Number of people accommodated")
+plt.ylabel("Price")
+plt.show()
+```
+
+```{python}
+data["n_accommodates2"] = data["n_accommodates"] ** 2
+data["ln_accommodates"] = np.log(data["n_accommodates"])
+data["ln_accommodates2"] = data["ln_accommodates"] ** 2
+```
+
+```{python}
+# Regression 1: ln price and num of accomodates and squares
+smf.ols(
+    formula="ln_price ~ n_accommodates + n_accommodates2", data=data
+).fit().summary()
+```
+
+```{python}
+# Regression 2: ln price and log num of accomodates
+
+smf.ols(formula="ln_price ~ ln_accommodates", data=data).fit().summary()
+```
+
+```{python}
+# Regression 3: ln price and num of accomodates
+smf.ols(formula="ln_price ~ n_accommodates", data=data).fit().summary()
+```
+
+```{python}
+data.groupby("n_beds").agg(
+    mean_price=("price", np.mean),
+    min_price=("price", np.min),
+    max_price=("price", np.max),
+    n=("price", "size"),
+)
+```
+
+```{python}
+# maybe best is to have log beds
+data["ln_beds"] = np.log(data["n_beds"])
+```
+
+```{python}
+sns.histplot(data, x="n_bathrooms", binwidth=0.5, alpha=1)
+plt.ylabel(None)
+plt.xlabel("Number of bathrooms")
+plt.show()
+```
+
+```{python}
+bins = [0, 1, 2, 10]
+labels = [0, 1, 2]
+
+data['f_bathroom'] = pd.cut(data['n_bathrooms'], bins=bins, labels=labels, right=False)
+```
+
+```{python}
+data["n_bathrooms"].dtype
+```
+
+```{python}
+data.groupby("f_bathroom").agg(mean_price=("price", np.mean), n=("price", "size"))
+```
+
+```{python}
+## Number of reviews
+nreview_plot = data.loc[data.n_number_of_reviews < 100]
+```
+
+```{python}
+sns.histplot(data, x="n_number_of_reviews", binwidth=5, alpha=1)
+plt.ylabel(None)
+plt.xlabel("Number of reviews")
+plt.xlim(0, 100)
+plt.show()
+```
+
+```{python}
+# number of reviews: use logs as well
+data["ln_number_of_reviews"] = np.log(data["n_number_of_reviews"] + 1)
+```
+
+```{python}
+sns.histplot(data, x="ln_number_of_reviews", binwidth=0.5, alpha=1)
+plt.ylabel(None)
+plt.xlabel("Log number of reviews")
+plt.show()
+```
+
+```{python}
+bins = [0,1,51,max(data.n_number_of_reviews)]
+labels = [0,1,2]
+data["f_number_of_reviews"] = pd.cut(data["n_number_of_reviews"],bins = bins, labels = labels, right = False)
+```
+
+```{python}
+data.groupby("f_number_of_reviews").agg(
+    median_price=("price", np.median),
+    mean_price=("price", np.mean),
+    n=("price", "size"),
+)
+```
+
+```{python}
+# Regression 1: log-price and number of reviews
+smf.ols(formula="ln_price ~ f_number_of_reviews", data=data).fit().summary()
+```
+
+```{python}
+# Regression 2: log-price and log number of reviews
+smf.ols(formula="ln_price ~ ln_number_of_reviews", data=data).fit().summary()
+```
+
+```{python}
+## Time since
+# Create variables, measuring the time since: squared, cubic, logs
+for var in [
+    "ln_days_since",
+    "ln_days_since2",
+    "ln_days_since3",
+    "n_days_since2",
+    "n_days_since3",
+]:
+    if var[:2] == "ln":
+        try:
+            data[var] = np.log(data["n_days_since"]) ** int(var[-1])
+        except ValueError:
+            data[var] = np.log(data["n_days_since"])
+    else:
+        data[var] = (data["n_days_since"]) ** int(var[-1])
+```
+
+```{python}
+# Check the effect
+lndays_plot = data.loc[(data.price <= 800) & (data.ln_days_since > 2)]
+```
+
+```{python}
+data.n_number_of_reviews.describe()
+```
+
+```{python}
+sns.scatterplot(data=data, x="n_number_of_reviews", y="price", s=20)
+da.plot_loess(data, "n_number_of_reviews", "price", span=0.8)
+plt.xlabel("Number of days since first review")
+plt.ylabel("Daily price (USD)")
+plt.show()
+```
+
+```{python}
+sns.scatterplot(data=data, x="n_review_scores_rating", y="price", s=20)
+da.plot_loess(data, "n_review_scores_rating", "price", span=0.8)
+plt.xlabel("Review score")
+plt.ylabel("Daily price (USD)")
+plt.show()
+```
+
+```{python}
+data["ln_review_scores_rating"] = np.log(data["n_review_scores_rating"])
+```
+
+```{python}
+# Regression 1) ln price - num of review scores
+smf.ols(formula="ln_price ~ n_review_scores_rating", data=data).fit().summary()
+```
+
+```{python}
+# Regression 2) ln price - log num of review scores
+
+smf.ols(formula="ln_price ~ ln_review_scores_rating", data=data).fit().summary()
+```
+
+```{python}
+## minimum nights
+smf.ols(formula="ln_price ~ n_minimum_nights", data=data).fit().summary()
+```
+
+```{python}
+bins = [1,2,3,max(data.n_minimum_nights)]
+labels = [1,2,3]
+data["f_minimum_nights"] = pd.cut(data["n_minimum_nights"], bins = bins, labels = labels, right = False)
+```
+
+```{python}
+## minimum nights
+smf.ols(formula="ln_price ~ f_minimum_nights", data=data).fit().summary()
+```
+
+```{python}
+###########################
+## look at categoricals  ##
+###########################
+data.groupby("f_property_type").agg(mean_price=("price", np.mean), n=("price", "size"))
+```
+
+```{python}
+data.groupby("f_room_type").agg(mean_price=("price", np.mean), n=("price", "size"))
+```
+
+```{python}
+data.groupby("f_cancellation_policy").agg(
+    mean_price=("price", np.mean), n=("price", "size")
+)
+```
+
+```{python}
+data.groupby("f_bed_type").agg(mean_price=("price", np.mean), n=("price", "size"))
+```
+
+```{python}
+inf = data.isin([np.inf, -np.inf]).sum()
+inf[inf > 0]
+```
+
+```{python}
+data = data.replace([np.inf, -np.inf], np.nan)
+```
+
+```{python}
+data.isnull().sum().loc[lambda x: x > 0]
+```
+
+```{python}
+data.to_csv(data_out + "airbnb_hackney_workfile_adj.csv", index=False)
+```
+
+```{python}
+data_out
+```
+
+

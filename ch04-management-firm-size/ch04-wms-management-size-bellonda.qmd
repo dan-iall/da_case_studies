@@ -1,0 +1,732 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 04
+**CH04A Management quality and firm size: describing patterns of association**
+
+using the wms-management-survey dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib.ticker import PercentFormatter
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+# location folders
+data_in = dirname + "da_data_repo/wms-management-survey/clean/"
+data_out = dirname + "da_case_studies/ch04-management-firm-size/"
+output = dirname + "da_case_studies/ch04-management-firm-size/output/"
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+import py_helper_functions as da
+
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# Import data
+df = pd.read_csv(data_in + "wms_da_textbook.csv")
+# df = pd.read_csv("https://osf.io/uzpce/download")
+
+```
+
+```{python}
+# # Sample selection
+# df = df.loc[
+#     (df["country"] == "Mexico")
+#     & (df["wave"] == 2013)
+#     & (df["emp_firm"] >= 100)
+#     & (df["emp_firm"] <= 5000)
+# ]
+```
+
+```{python}
+df = df.query(
+    'country == "Mexico" and wave == 2013 and 100 <= emp_firm <= 5000'
+)
+```
+
+```{python}
+df.head()
+```
+
+```{python}
+df.emp_firm.describe()
+```
+
+```{python}
+# Save workfile
+df.to_csv(data_out + "ch04-wms-work.csv", index=False)
+# Summary
+# df.filter(["management", "emp_firm"]).describe()
+df[['management', 'emp_firm']].describe()
+```
+
+### Figure 4.1 Distribution of the management score variable
+
+```{python}
+
+sns.histplot(
+    data=df,
+    x="management",
+    binwidth=0.25,  
+    binrange=(1,5),  # Set the range of the bins from 1 to 5
+    color=da.color[0],
+    edgecolor="white",
+    stat="probability",  # Other options: "count", "frequency", "density", "percent"
+    alpha=1, # No transparency (fully opaque)
+)
+
+plt.xlabel("Management score") # From matplotlib.pyplot
+plt.ylabel("Percent")
+plt.ylim(0, 0.25)
+plt.yticks(ticks=np.arange(0, 0.26, 0.05))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1)) # Formatting: Sets the y-axis tick labels to display as percentages. `PercentFormatter(1)` means it will multiply the value by 100 and add a percent sign, with 1 decimal place.
+plt.xlim(1, 5) # Axis Limits: Sets the x-axis limits from 1 to 5.
+plt.xticks(ticks=np.arange(1, 6, 1))
+plt.show()
+```
+
+### Figure 4.2 The distribution of employment
+
+(a) Number of employees
+
+```{python}
+sns.histplot(
+    data=df,
+    x="emp_firm",
+    binwidth=200,  
+    binrange=(0,5000),
+    color=da.color[0],
+    edgecolor="white",
+    stat="probability",  
+    alpha=1,
+)
+
+plt.xlabel("Firm size (employment)")
+plt.ylabel("Percent")
+plt.ylim(0, 0.3)
+plt.yticks(ticks=np.arange(0, 0.31, 0.05))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.xlim(0, 5000)
+plt.xticks(ticks=np.arange(0, 5001, 1000))  
+plt.show()
+```
+
+```{python}
+# df["lnemp"] = np.log(df.emp_firm)
+df['lnemp'] = np.log(df['emp_firm'])
+# df = df.assign(lnemp=np.log(df['emp_firm']))
+df["lnemp"].describe()
+```
+
+(b) Natural log of number of employees
+
+```{python}
+sns.histplot(
+    data=df,
+    x="lnemp",
+    binwidth=0.25,  
+    binrange=(4,9),
+    color=da.color[0],
+    edgecolor="white",
+    stat="probability",  
+    alpha=1,
+)
+
+plt.xlabel("Firm size (ln(employment))")
+plt.ylabel("Percent")
+plt.ylim(0, 0.2)
+plt.yticks(ticks=np.arange(0, 0.21, 0.04))
+plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+plt.xlim(4, 9)
+plt.xticks(ticks=np.arange(4, 9, 1))  
+plt.show()
+```
+
+```{python}
+# df['emp3bins'] = np.where(df['emp_firm'] < 200, 1, np.nan)
+# df['emp3bins'] = np.where(
+#     (df['emp_firm'] >= 200) & (df['emp_firm'] < 1000), 2, df['emp3bins']
+# )
+# df['emp3bins'] = np.where(df['emp_firm'] >= 1000, 3, df['emp3bins'])
+# df['emp3bins'].head()
+```
+
+```{python}
+# Create the bins with infinite edges to catch everything
+# right=False ensures 200 goes into the [200, 1000) bin, matching the original logic
+df['emp3bins'] = pd.cut(df['emp_firm'], 
+                        bins=[0, 200, 1000, np.inf], # Define the bin edges: [0, 200), [200, 1000), [1000, inf) In NumPy (and by extension, pandas), np.inf stands for Positive Infinity.
+                        labels=[1, 2, 3], 
+                        right=False) # right=False means the bins include the left edge but not the right edge
+df['emp3bins'].head(10)
+```
+
+```{python}
+df.emp3bins.value_counts()
+```
+
+```{python}
+df["emp3bins"].describe()
+```
+
+### Figure 4.3 Quality of specific management practices by three bins of firm size: conditional probabilities
+
+(a) Lean management
+
+```{python}
+df[["emp3bins", "lean1"]]
+```
+
+```{python}
+#Step 1: Building the Frequency Table (The Core)
+df1 = (
+    df.filter(["emp3bins", "lean1"])
+    .groupby(["emp3bins", "lean1"])
+    .agg(Count=("emp3bins", "size")) #size here is a function name, not a column name!
+    .reset_index()
+)
+#Step 2: The Denominator (The Broadcast)
+df1["Group_count"] = df1.groupby("emp3bins")["Count"].transform("sum")
+df1["Percent"] = df1["Count"] / df1["Group_count"]
+df1["lean1"] = pd.Categorical(
+    df1["lean1"], categories=sorted(set(df1["lean1"]), reverse=True)
+)
+df1["emp3bins"] = pd.Categorical(
+    df1["emp3bins"], categories=sorted(set(df1["emp3bins"]), reverse=True)
+)
+```
+
+```{python}
+# Create a Wide-Format table of percentages immediately
+cross = pd.crosstab(df['emp3bins'], df['lean1'], normalize='index')
+
+# If you need it back in Long Format (like your df1) for plotting:
+df1_compact = (
+    pd.crosstab(df['emp3bins'], df['lean1'], normalize='index')
+    .stack()
+    .reset_index(name='Percent')
+)
+df1_compact
+```
+
+```{python}
+df1
+```
+
+```{python}
+
+categories = df1_compact["emp3bins"].astype(int).unique().tolist() 
+categories.sort(reverse = True)  
+subcategories = df1_compact["lean1"].unique()  
+color_order = [da.color[3],da.color[1],da.color[4],da.color[0],da.color[2]]
+pivot_df = df1_compact.pivot_table(index="emp3bins", columns="lean1", values="Percent", aggfunc="sum").fillna(0)
+pivot_df = pivot_df.loc[categories]  
+
+bar_width = 0.5
+x = np.arange(len(categories))
+
+fig, ax = plt.subplots()
+bottom = np.zeros(len(categories))  
+for i, subcat in enumerate(subcategories):
+    ax.bar(
+        x,
+        pivot_df[subcat],
+        width=bar_width,
+        bottom=bottom,
+        label=subcat,
+        color=color_order[i],
+        alpha=1,
+        edgecolor="white",
+    )
+    bottom += pivot_df[subcat]  
+
+
+ax.set_xticks(x)
+ax.set_xticklabels(categories,  ha="right")
+ax.set_xlabel("Firm size (employment), 3 bins")
+
+ax.set_yticks(np.arange(0, 1.1, 0.2))  
+ax.set_ylim(0, 1)
+ax.set_ylabel("Percent")
+ax.yaxis.set_major_formatter(PercentFormatter(1))  
+
+ax.legend(
+    title=" ", 
+    loc="upper right", 
+    bbox_to_anchor=(1.15, 0.75),  
+    frameon=False
+)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["left"].set_linewidth(0.5)
+ax.spines["bottom"].set_linewidth(0.5)
+ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
+ax.set_axisbelow(True)
+plt.show()
+```
+
+(b) Performance tracking
+
+```{python}
+df1 = (
+    df.filter(["emp3bins", "perf2"])
+    .groupby(["emp3bins", "perf2"])
+    .agg(Count=("emp3bins", "size"))
+    .reset_index()
+)
+df1["Group_count"] = df1.groupby("emp3bins")["Count"].transform("sum")
+df1["Percent"] = df1["Count"] / df1["Group_count"]
+df1["perf2"] = pd.Categorical(
+    df1["perf2"], categories=sorted(set(df1["perf2"]), reverse=True)
+)
+df1["emp3bins"] = pd.Categorical(
+    df1["emp3bins"], categories=sorted(set(df1["emp3bins"]), reverse=True)
+)
+```
+
+```{python}
+
+categories = df1["emp3bins"].astype(int).unique().tolist() 
+categories.sort(reverse = True)  
+subcategories = df1["perf2"].unique()  
+
+color_order = [da.color[3],da.color[1],da.color[4],da.color[0],da.color[2]]
+
+pivot_df = df1.pivot_table(index="emp3bins", columns="perf2", values="Percent", aggfunc="sum").fillna(0)
+pivot_df = pivot_df.loc[categories]  
+
+bar_width = 0.5
+x = np.arange(len(categories))
+
+fig, ax = plt.subplots()
+bottom = np.zeros(len(categories))  
+for i, subcat in enumerate(subcategories):
+    ax.bar(
+        x,
+        pivot_df[subcat],
+        width=bar_width,
+        bottom=bottom,
+        label=subcat,
+        color=color_order[i],
+        alpha=1,
+        edgecolor="white",
+    )
+    bottom += pivot_df[subcat]  
+
+
+ax.set_xticks(x)
+ax.set_xticklabels(categories,  ha="right")
+ax.set_xlabel("Firm size (employment), 3 bins")
+
+ax.set_yticks(np.arange(0, 1.1, 0.2))  
+ax.set_ylim(0, 1)
+ax.set_ylabel("Percent")
+ax.yaxis.set_major_formatter(PercentFormatter(1))  
+
+ax.legend(
+    title=" ", 
+    loc="upper right", 
+    bbox_to_anchor=(1.15, 0.75), 
+    frameon=False
+)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["left"].set_linewidth(0.5)
+ax.spines["bottom"].set_linewidth(0.5)
+ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
+ax.set_axisbelow(True)
+plt.show()
+```
+
+```{python}
+# Bin scatters avg score by employment bins
+
+# Option 1: create 3 bins as defined by thresholds
+
+# Summary
+
+df.groupby("emp3bins")["emp_firm"].agg(["min", "max", "mean", "median", np.std, "size"])
+```
+
+```{python}
+# Recode employee bins
+df["emp3bins"] = df["emp3bins"].replace(1, 150).replace(2, 600).replace(3, 3000)
+```
+
+```{python}
+# Summary
+df.groupby("emp3bins")["emp_firm"].agg(["min", "max", "mean", "median", np.std, "size"])
+```
+
+```{python}
+# Generate variables by mean
+df1 = (
+    df.groupby("emp3bins").agg(management_emp3bins=("management", "mean")).reset_index()
+)
+df1
+```
+
+### Figure 4.4 Mean management quality score and firm size
+
+(a) Three bins of employment
+
+```{python}
+scatter = sns.scatterplot(
+    data=df1,
+    x="emp3bins",
+    y="management_emp3bins",
+    s=30,  
+    color=da.color[0],
+    alpha=1,
+    edgecolor=da.color[2]  
+)
+
+plt.xlim(0, 3020)
+plt.ylim(2.38, 3.42)
+plt.xticks(ticks=np.arange(0, 3020, 500))  
+plt.yticks(ticks=np.arange(2.4,3.42,0.2))  
+plt.xlabel("Firm size (employment), 3 bins")
+plt.ylabel("Management score")
+plt.show()
+```
+
+```{python}
+df["emp10bins"] = pd.qcut(df["emp_firm"], 10)
+```
+
+```{python}
+# Summary
+df_summary = (
+    df.filter(["emp_firm", "emp10bins"])
+    .groupby("emp10bins")
+    .agg(["min", "max", "mean", "median", np.std, "size"])
+)
+df_summary
+```
+
+```{python}
+# Recode with bin means
+df = df.replace({"emp10bins": df_summary["emp_firm"]["mean"].to_dict()})
+```
+
+```{python}
+df.groupby("emp10bins")["emp_firm"].agg(
+    ["min", "max", "mean", "median", np.std, "size"]
+)
+```
+
+```{python}
+# Generate variables by mean
+df1 = (
+    df.groupby("emp10bins")
+    .agg(management_emp10bins=("management", "mean"))
+    .reset_index()
+    .assign(emp10bins = lambda x: x["emp10bins"].astype(int))
+)
+df1
+```
+
+(b) Ten bins of employment
+
+```{python}
+scatter = sns.scatterplot(
+    data=df1,
+    x="emp10bins",
+    y="management_emp10bins",
+    s=30,  
+    color=da.color[0],
+    alpha=1,
+    edgecolor=da.color[2]  
+)
+
+
+plt.xlim(0, 3520)
+plt.ylim(2.48, 3.52)
+plt.xticks(ticks=np.arange(0, 3520, 500))  
+plt.yticks(ticks=np.arange(2.5,3.52,0.2))  
+plt.xlabel("Firm size (employment), 10 bins")
+plt.ylabel("Management score")
+plt.show()
+```
+
+### Figure 4.5 The joint distribution of the management quality score and firm size
+
+(a) By employment
+
+```{python}
+scatter = sns.scatterplot(
+    data=df,
+    x="emp_firm",
+    y="management",
+    s=20,  
+    color=da.color[0],
+    alpha=1,
+    edgecolor = da.color[0]
+)
+
+plt.xlim(-50, 5040)
+plt.ylim(0.95, 5.1)
+plt.xticks(ticks=np.arange(0, 5040, 1000))  
+plt.yticks(ticks=np.arange(1,5.1,1))  
+plt.xlabel("Firm size (employment)")
+plt.ylabel("Management score")
+plt.show()
+```
+
+(b) By log employment
+
+```{python}
+df["lnemp"] = np.log(df["emp_firm"])
+
+scatter = sns.scatterplot(
+    data=df,
+    x="lnemp",
+    y="management",
+    s=20,  
+    color=da.color[0],
+    alpha=1
+)
+
+plt.xlim(3.9, 9.1)
+plt.ylim(0.95, 5.1)
+plt.xticks(ticks=np.arange(4, 9.1, 1))  
+plt.yticks(ticks=np.arange(1,5.1,1))  
+plt.xlabel("Firm size  (ln(employment))")
+plt.ylabel("Management score")
+plt.show()
+```
+
+### Figure 4.6 Conditional summary statistics of the management score by bins of firm size
+
+```{python}
+df = df.replace({"emp3bins": {150: "Small", 600: "Medium", 3000: "Large"}})
+df['emp3bins'] = pd.Categorical(df['emp3bins'], categories=sorted(set(df['emp3bins']), reverse=True))
+```
+
+```{python}
+import matplotlib as mpl
+```
+
+```{python}
+fig, ax = plt.subplots()
+sns.boxplot(
+    data=df, x="emp3bins", y="management", width=0.5, ax=ax, flierprops={"marker": "o"}
+)
+
+box_line_col = [da.color[1], da.color[0], da.color[2]]
+for i, box_col in enumerate(box_line_col):
+    mybox = ax.patches[i]
+    mybox.set_facecolor(mpl.colors.to_rgba(box_col, 0.5))
+    mybox.set_edgecolor(box_col)
+    for j in range(i * 6, i * 6 + 6):
+        line = ax.lines[j]
+        line.set_color(box_col)
+        line.set_mfc(mpl.colors.to_rgba(box_col, 0.5))
+        line.set_mec(mpl.colors.to_rgba(box_col, 0.5))
+
+plt.ylabel("Management score", size=12)
+plt.xlabel("Firm size (employment), 3 bins", size=12)
+plt.yticks(da.seq(1, 5, 1))
+plt.show()
+```
+
+Violin plot
+
+```{python}
+fig, ax = plt.subplots()
+sns.violinplot(
+    data=df,
+    x="emp3bins",
+    y="management",
+    ax=ax,
+    inner_kws={"marker": "o"},
+    width=1,
+    linewidth=0.8,
+    inner=None,
+)
+
+violin_line_col = [da.color[1], da.color[0], da.color[2]]
+for i, violin_col in enumerate(violin_line_col):
+    mybox = ax.collections[i]
+    mybox.set_facecolor(mpl.colors.to_rgba(violin_col, 0.3))
+    mybox.set_edgecolor(violin_col)
+
+sns.boxplot(
+    data=df,
+    x="emp3bins",
+    y="management",
+    ax=ax,
+    width=0.23,
+    showcaps=False,
+    flierprops={"marker": "o"},
+)
+
+box_line_col = [da.color[1], da.color[0], da.color[2]]
+for i, box_col in enumerate(box_line_col):
+    mybox = ax.patches[i]
+    mybox.set_facecolor(mpl.colors.to_rgba(box_col, 0.4))
+    mybox.set_edgecolor(box_col)
+    for j in range(i * 4, i * 4 + 4):
+        line = ax.lines[j]
+        line.set_color(box_col)
+        line.set_mfc(mpl.colors.to_rgba(box_col, 0.4))
+        line.set_mec(mpl.colors.to_rgba(box_col, 0.4))
+
+plt.ylabel("Management score", size=12)
+plt.xlabel("Firm size (employment), 3 bins", size=12)
+plt.yticks(da.seq(0, 6, 1))
+plt.show()
+```
+
+```{python}
+# Correlation
+df["management"].corr(df["emp_firm"])
+```
+
+```{python}
+# by industry
+df.loc[df["sic"] <= 21, "industry_broad"] = "food_drinks_tobacco"
+df.loc[
+    ((df["sic"] >= 22) & (df["sic"] <= 23)) | (df["sic"] == 31), "industry_broad"
+] = "textile_apparel_leather_etc"
+df.loc[(df["sic"] >= 24) & (df["sic"] <= 27), "industry_broad"] = "wood_furniture_paper"
+df.loc[(df["sic"] >= 28) & (df["sic"] <= 30), "industry_broad"] = "chemicals_etc"
+df.loc[(df["sic"] >= 32) & (df["sic"] < 35), "industry_broad"] = "materials_metals"
+df.loc[(df["sic"] >= 35) & (df["sic"] < 37), "industry_broad"] = "electronics"
+df.loc[df["sic"] == 37, "industry_broad"] = "auto"
+df.loc[df["sic"] >= 38, "industry_broad"] = "other"
+```
+
+```{python}
+df["industry_broad"].value_counts()
+```
+
+```{python}
+# Correlation
+df.groupby("industry_broad")[["management", "emp_firm"]].corr().iloc[0::2, -1]
+```
+
+```{python}
+(
+    df.loc[df["industry_broad"].notna(), ["management", "industry_broad"]]
+    .groupby("industry_broad")
+    .agg(
+        Min=("management", "min"),
+        Max=("management", "max"),
+        SD=("management", np.std),
+        Median=("management", "median"),
+        n=("management", "size"),
+    )
+    .round(3)
+)
+```
+
+```{python}
+(
+    df.loc[df["industry_broad"].notna(), ["emp_firm", "industry_broad"]]
+    .groupby("industry_broad")
+    .agg(
+        Min=("emp_firm", "min"),
+        Max=("emp_firm", "max"),
+        SD=("emp_firm", np.std),
+        Median=("emp_firm", "median"),
+        n=("emp_firm", "size"),
+    )
+    .round(3)
+)
+```
+
+```{python}
+# Correlation
+cor = (
+    df.groupby("industry_broad")[["management", "emp_firm"]]
+    .corr()
+    .iloc[0::2, -1]
+    .reset_index()
+    .drop(["level_1"], axis=1)
+    .set_index("industry_broad")
+    .rename({"emp_firm": "correlation"}, axis=1)
+)
+cor.round(3)
+```
+
+```{python}
+table41 = (
+    df.filter(["emp_firm", "industry_broad", "management"])
+    .groupby("industry_broad")
+    .agg(Mean=("management", "mean"), Obs=("management", "size"))
+)
+table41["Corr"] = cor["correlation"]
+```
+
+```{python}
+table41.index = [
+    "Auto",
+    "Chemicals",
+    "Machinery, equipment, electronics",
+    "Food, drinks, tobacco",
+    "Materials, metals",
+    "Textile, apparel, leather",
+    "Wood, furniture, paper",
+    "Other",
+]
+table41.round(3)
+```
+
+```{python}
+last_row = (
+    table41.groupby(lambda _: True)
+    .agg(Mean=("Mean", "mean"), Obs=("Obs", "sum"), Corr=("Corr", "mean"))
+    .reset_index(drop=True)
+)
+last_row.index = ["All"]
+table41 = pd.concat([table41, last_row])
+```
+
+```{python}
+table41 = table41.filter(["Corr", "Mean", "Obs"]).reset_index()
+table41.columns = [
+    "Industry",
+    "Management - employment correlation",
+    "Management score",
+    "Observations",
+]
+```
+
+```{python}
+table41.round(2)
+```
+

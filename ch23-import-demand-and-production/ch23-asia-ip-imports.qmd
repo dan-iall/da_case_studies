@@ -1,0 +1,432 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+### Chapter 23
+**CH 23 IMPORT DEMAND AND PRODUCTION**
+
+using the asia-industry dataset
+
+version 1.0 2021-05-05
+
+
+```{python}
+import os
+import sys
+import warnings
+from datetime import datetime as dt
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/asia-industry/clean/"
+data_out = dirname + "da_case_studies/ch23-import-demand-and-production/"
+output = dirname + "da_case_studies/ch23-import-demand-and-production/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+```{python}
+# import data
+raw = pd.read_csv(data_in + "asia-industry_tidy.csv")
+# raw = pd.read_csv("https://osf.io/3kd4c/download")
+```
+
+```{python}
+data = raw.loc[lambda x: x["year"] >= 1998]
+```
+
+```{python}
+data = data.drop(data.loc[lambda x: (x["year"] == 1998) & (x["month"] == 1)].index)
+data = data.drop(data.loc[lambda x: (x["year"] == 2018) & (x["month"] > 4)].index)
+```
+
+```{python}
+data.groupby("countrycode").agg(
+    mean=("ind_prod_const", "mean"),
+    std_dev=("ind_prod_const", "first"),
+    freq=("ind_prod_const", "count"),
+).dropna().reset_index().sort_values(by="countrycode")
+```
+
+```{python}
+# feature engineering
+```
+
+```{python}
+usa_ip_sa = data.loc[
+    lambda x: x["countrycode"] == "USA", ["time", "ind_prod_const_sa"]
+].rename(columns={"ind_prod_const_sa": "usa_ip_sa"})
+
+data = data.merge(usa_ip_sa, how="left", on="time")
+```
+
+```{python}
+chn_ip_sa = data.loc[
+    lambda x: x["countrycode"] == "CHN", ["time", "ind_prod_const_sa"]
+].rename(columns={"ind_prod_const_sa": "chn_ip_sa"})
+
+data = data.merge(chn_ip_sa, how="left", on="time")
+```
+
+```{python}
+data["ln_ip"] = np.log(data["ind_prod_const_sa"] + 1)
+data["ln_usa_ip"] = np.log(data["usa_ip_sa"] + 1)
+data["ln_chn_ip"] = np.log(data["chn_ip_sa"] + 1)
+data["ln_usa_imports"] = np.log(data["usa_imp_sa"] + 1)
+data["ln_er_usd"] = np.log(data["exchnage_rate_vs_usd"] + 1)
+```
+
+```{python}
+data = data.dropna(subset=["ln_ip"])
+```
+
+```{python}
+data = data.loc[
+    lambda x: (x["countrycode"] == "MYS")
+    | (x["countrycode"] == "PHL")
+    | (x["countrycode"] == "SGP")
+    | (x["countrycode"] == "THA")
+]
+```
+
+```{python}
+data.groupby("countrycode")["country"].count()
+```
+
+```{python}
+# panel setup
+# encode country , gen(cc)
+# sort cc time
+# tsset cc time
+```
+
+```{python}
+data["cc"] = data["countrycode"].astype("category")
+```
+
+```{python}
+# lagged variables
+work = data.sort_values(by=["cc", "time"])
+```
+
+```{python}
+work["dln_ip"] = work.groupby("cc")["ln_ip"].transform("diff")
+work["dln_usa_ip"] = work.groupby("cc")["ln_usa_ip"].transform("diff")
+work["dln_chn_ip"] = work.groupby("cc")["ln_chn_ip"].transform("diff")
+work["dln_usa_imports"] = work.groupby("cc")["ln_usa_imports"].transform("diff")
+work["ddln_usa_imports"] = work.groupby("cc")["dln_usa_imports"].transform("diff")
+work["dln_er_usd"] = work.groupby("cc")["ln_er_usd"].transform("diff")
+```
+
+```{python}
+work.groupby("countrycode").agg(mean=("dln_ip", np.nanmean))
+```
+
+```{python}
+# create time variables
+work["date"] = (work["year"].astype(str) + "-" + data["month"].astype(str)).apply(
+    lambda x: dt.strptime(x, "%Y-%m")
+)
+```
+
+```{python}
+thai_data = work.loc[work["country"] == "Thailand"].reset_index()
+fig, ax = plt.subplots()
+
+# Plot the line chart
+sns.lineplot(data=thai_data, x="date", y="ln_ip", ax=ax, linewidth=0.6)
+
+# Add vertical lines and annotations
+ax.axvline(
+    x=dt.strptime("2008-11-01", "%Y-%m-%d"),
+    color=da.color[2],
+    linestyle="--",
+    linewidth=0.8,
+)
+ax.text(
+    dt.strptime("2008-07-01", "%Y-%m-%d"),
+    22.7,
+    "2008-09 crisis",
+    color=da.color[2],
+    fontsize=8,
+    rotation=90,
+)
+
+ax.axvline(
+    x=dt.strptime("2011-10-01", "%Y-%m-%d"),
+    color=da.color[2],
+    linestyle="--",
+    linewidth=0.8,
+)
+ax.text(
+    dt.strptime("2011-06-01", "%Y-%m-%d"),
+    22.7,
+    "2011-12 flood",
+    color=da.color[2],
+    fontsize=8,
+    rotation=90,
+)
+
+ax.set_xlabel("Date (month)", fontsize=12)
+ax.set_ylabel("ln(Thai industrial production, bn US dollars)", fontsize=12)
+
+
+ax.set_yticks([22.4, 22.6, 22.8, 23.0, 23.2, 23.4])
+x_ticks = [
+    "1998-01-01",
+    "2002-01-01",
+    "2006-01-01",
+    "2010-01-01",
+    "2014-01-01",
+    "2018-01-01",
+]
+x_tick_labels = [dt.strptime(date, "%Y-%m-%d").strftime("%b%Y") for date in x_ticks]
+ax.set_xticks([pd.Timestamp(date) for date in x_ticks])
+ax.set_xticklabels(x_tick_labels)
+
+plt.show()
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+# Plot the line chart
+sns.lineplot(data=thai_data, x="date", y="dln_ip", ax=ax, linewidth=0.6)
+
+ax.set_ylim(-0.3, 0.2)
+ax.set_yticks([-0.3, -0.2, -0.1, 0.0, 0.1, 0.2])
+
+# Add vertical lines and annotations
+ax.axvline(
+    x=dt.strptime("2008-11-01", "%Y-%m-%d"),
+    color=da.color[2],
+    linestyle="--",
+    linewidth=0.8,
+)
+ax.text(
+    dt.strptime("2008-06-01", "%Y-%m-%d"),
+    -0.2,
+    "2008-09 crisis",
+    color=da.color[2],
+    fontsize=8,
+    rotation=90,
+)
+
+ax.axvline(
+    x=dt.strptime("2011-10-01", "%Y-%m-%d"),
+    color=da.color[2],
+    linestyle="--",
+    linewidth=0.8,
+)
+ax.text(
+    dt.strptime("2011-05-01", "%Y-%m-%d"),
+    -0.2,
+    "2011-12 flood",
+    color=da.color[2],
+    fontsize=8,
+    rotation=90,
+)
+
+ax.set_xlabel("Date (month)", fontsize=12)
+ax.set_ylabel("Change ln(Thai industrial prod., bn US dollars)", fontsize=12)
+
+
+x_ticks = [
+    "1998-01-01",
+    "2002-01-01",
+    "2006-01-01",
+    "2010-01-01",
+    "2014-01-01",
+    "2018-01-01",
+]
+x_tick_labels = [dt.strptime(date, "%Y-%m-%d").strftime("%b%Y") for date in x_ticks]
+ax.set_xticks([pd.Timestamp(date) for date in x_ticks])
+ax.set_xticklabels(x_tick_labels)
+da.add_margin(ax, x=0.005, y=0)
+
+plt.show()
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+
+sns.lineplot(
+    data=work.reset_index(), x="date", y="ln_usa_imports", ax=ax, linewidth=0.6
+)
+
+ax.set_xlabel("Date (month)", fontsize=12)
+ax.set_ylabel("ln(USA imports, bn US dollars)", fontsize=12)
+
+
+ax.set_yticks([11.2, 11.4, 11.6, 11.8, 12.0, 12.2])
+
+# Set x-axis ticks and format
+x_ticks = [
+    "1998-01-01",
+    "2002-01-01",
+    "2006-01-01",
+    "2010-01-01",
+    "2014-01-01",
+    "2018-01-01",
+]
+x_tick_labels = [dt.strptime(date, "%Y-%m-%d").strftime("%b%Y") for date in x_ticks]
+ax.set_xticks([pd.Timestamp(date) for date in x_ticks])
+ax.set_xticklabels(x_tick_labels)
+
+crisis_date = pd.Timestamp("2008-11-01")
+ax.axvline(x=crisis_date, color=da.color[2], linestyle="--", linewidth=0.8)
+
+ax.text(
+    pd.Timestamp("2008-06-01"),
+    11.4,
+    "2008-09 crisis",
+    color=da.color[2],
+    fontsize=9,
+    rotation=90,
+    verticalalignment="center",
+)
+
+plt.show()
+```
+
+```{python}
+fig, ax = plt.subplots()
+
+# Plot the line chart
+sns.lineplot(
+    data=work.reset_index(), x="date", y="dln_usa_imports", ax=ax, linewidth=0.6
+)
+
+ax.set_ylim(-0.2, 0.15)
+ax.set_yticks(np.arange(-0.2, 0.16, 0.1))
+ax.margins(y=0.01)
+
+x_ticks = [
+    "1998-01-01",
+    "2002-01-01",
+    "2006-01-01",
+    "2010-01-01",
+    "2014-01-01",
+    "2018-01-01",
+]
+x_tick_labels = [dt.strptime(date, "%Y-%m-%d").strftime("%b%Y") for date in x_ticks]
+ax.set_xticks([pd.Timestamp(date) for date in x_ticks])
+ax.set_xticklabels(x_tick_labels)
+
+ax.axvline(
+    x=pd.Timestamp("2008-11-01"), color=da.color[2], linestyle="--", linewidth=0.8
+)
+ax.text(
+    pd.Timestamp("2008-06-01"),
+    -0.13,
+    "2008-09 crisis",
+    color=da.color[2],
+    fontsize=9,
+    rotation=90,
+    verticalalignment="center",
+)
+
+ax.set_xlabel("Date (month)", fontsize=12)
+ax.set_ylabel("Change in ln(USA imports, bn US dollars)", fontsize=12)
+plt.show()
+```
+
+```{python}
+# REGRESSIONS
+
+# Serial correlation matters because it may lead to biased standard error estimates.
+# We recommended two ways to address this problem: estimate Newey–West standard errors
+# or include the lag of the dependent variable in the regression. (Used here.)
+```
+
+```{python}
+lags_usa = " + ".join(["dln_usa_imports.shift({i})".format(i=i) for i in range(0, 5)])
+lags_ip = " + ".join(["dln_ip.shift({i})".format(i=i) for i in range(1, 3)])
+
+thai_formula = "dln_ip ~ " + lags_usa + " + " + lags_ip
+```
+
+```{python}
+pf.feols(thai_formula, work.loc[lambda x: x["countrycode"] == "THA"]).summary()
+```
+
+```{python}
+# long-term coeff, lagged dy, countries separately
+lags_usa = " + ".join(["ddln_usa_imports.shift({i})".format(i=i) for i in range(0, 4)])
+lt_formula = "dln_ip ~ dln_usa_imports.shift(4) + " + lags_usa + "+ dln_ip.shift(1)"
+```
+
+```{python}
+countries = ["THA", "MYS", "PHL", "SGP"]
+reg_results = []
+
+for country in countries:
+    reg_results.append(
+        pf.feols(lt_formula, work.loc[lambda x: x["countrycode"] == country])
+    )
+```
+
+```{python}
+# long-term coeff, lagged dy, countries pooled
+lt_formula_pooled = (
+    "dln_ip ~ dln_usa_imports.shift(4) + " + lags_usa + " + dln_ip.shift(1) + cc"
+)
+pooled_reg_lt = pf.feols(lt_formula_pooled, work)
+```
+
+### Table 23.1 US imports and industrial production in Thailand and three other countries
+
+```{python}
+pf.etable(
+    reg_results + [pooled_reg_lt],
+    model_heads=["Thailand", "Malaysia", "Philippines", "Singapore", "Pooled"],
+    head_order="h",
+    labels={
+        "Intercept": "Constant",
+        "dln_usa_imports.shift(4)": "USA imports log change, cumulative coeff.",
+        "dln_ip.shift(1)": "Industrial production log change, lag",
+        "cc[T.PHL]": "Philippines",
+        "cc[T.SGP]": "Singapore",
+        "cc[T.THA]": "Thailand",
+    },
+    drop="ddln_usa_imports",
+    show_se_type=False,
+)
+```
+
+

@@ -1,0 +1,306 @@
+---
+title: Prepared for Gabor's Data Analysis
+jupyter: python3
+---
+
+
+### Data Analysis for Business, Economics, and Policy
+by Gabor Bekes and  Gabor Kezdi
+ 
+Cambridge University Press 2021
+
+**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+
+ License: Free to share, modify and use for educational purposes. 
+ Not to be used for commercial purposes.
+
+
+### CHAPTER 20
+**CH20A Working from home and employee performance**
+
+using the wfh dataset
+
+version 0.9.0 2025-08-14
+
+
+```{python}
+import os
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+import pyfixest as pf
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+```
+
+```{python}
+# Current script folder
+current_path = os.getcwd()
+dirname = current_path.split("da_case_studies")[0]
+
+# location folders
+data_in = dirname + "da_data_repo/working-from-home/clean/"
+data_out = dirname + "da_case_studies/ch20-working-from-home/"
+output = dirname + "da_case_studies/ch20-working-from-home/output/"
+
+func = dirname + "da_case_studies/ch00-tech-prep/"
+sys.path.append(func)
+```
+
+```{python}
+# Import the prewritten helper functions
+import py_helper_functions as da
+
+# Set custom color scheme for plots
+sns.set_theme(rc=da.da_theme, palette=da.color)
+```
+
+### Load data
+
+```{python}
+data = pd.read_csv(data_in + "wfh_tidy_person.csv")
+# data = pd.read_csv("https://osf.io/jvgrf/download")
+```
+
+### Balance
+
+```{python}
+data["ageyoungestchild"] = np.where(
+    data["children"] == 0, None, data["ageyoungestchild"]
+)
+
+data["ageyoungestchild"] = pd.to_numeric(data["ageyoungestchild"])
+data["ordertaker"] = data["ordertaker"].astype(int)
+```
+
+```{python}
+mean_t = dict()
+mean_c = dict()
+sd = dict()
+p_value = dict()
+
+variables = [
+    "perform10",
+    "age",
+    "male",
+    "second_technical",
+    "high_school",
+    "tertiary_technical",
+    "university",
+    "prior_experience",
+    "tenure",
+    "married",
+    "children",
+    "ageyoungestchild",
+    "rental",
+    "costofcommute",
+    "internet",
+    "bedroom",
+    "basewage",
+    "bonus",
+    "grosswage",
+    "ordertaker",
+]
+
+for i in variables:
+    # Regression model
+    model = pf.feols(f"{i}~treatment", data=data)
+
+    # Mean control
+    mean_c[i] = data.loc[data["treatment"] == 0, i].dropna().mean()
+    # Mean treated
+    mean_t[i] = data.loc[data["treatment"] == 1, i].dropna().mean()
+    # p-value from regression
+    p_value[i] = model.pvalue()[1]
+    # Standard deviation
+    sd[i] = data[i].dropna().std()
+```
+
+```{python}
+table = pd.DataFrame([mean_t, mean_c, sd, p_value]).T.round(2)
+table.columns = [
+    "Treatment mean",
+    "Control mean",
+    "Std.dev.",
+    "p-value of test of equal means",
+]
+```
+
+```{python}
+table
+```
+
+ ### outcomes
+
+```{python}
+# quit firm during 8 months of experiment
+# phone calls worked, for order takers
+```
+
+```{python}
+quitjobs = (
+    data.groupby("treatment")
+    .agg(mean=("quitjob", "mean"), std=("quitjob", "std"), N=("quitjob", "count"))
+    .round(3)
+)
+```
+
+```{python}
+total_quitjob = data.agg(
+    mean_total=("quitjob", "mean"),
+    std_total=("quitjob", "std"),
+    N_total=("quitjob", "count"),
+).T.round(3)
+```
+
+```{python}
+quitjobs
+```
+
+```{python}
+total_quitjob
+```
+
+```{python}
+phonecalls1 = (
+    data.query("ordertaker==1")
+    .groupby("treatment")
+    .agg(
+        mean=("phonecalls1", "mean"),
+        std=("phonecalls1", "std"),
+        N=("phonecalls1", "count"),
+    )
+    .round(2)
+)
+```
+
+```{python}
+total_phonecalls = (
+    data.query("ordertaker==1")
+    .agg(
+        mean_total=("phonecalls1", "mean"),
+        std_total=("phonecalls1", "std"),
+        N_total=("phonecalls1", "count"),
+    )
+    .T.round(2)
+)
+```
+
+```{python}
+phonecalls1
+```
+
+```{python}
+total_phonecalls
+```
+
+```{python}
+# Bar chart for quit rates
+```
+
+```{python}
+data["quit_pct"] = data["quitjob"] * 100
+data["stayed_pct"] = (1 - data["quitjob"]) * 100
+```
+
+```{python}
+barchart_data = (
+    data[["treatment", "quit_pct", "stayed_pct"]]
+    .groupby("treatment")
+    .agg({"stayed_pct": "mean", "quit_pct": "mean"})
+    .reset_index()
+)
+barchart_data["treatment"] = np.where(
+    barchart_data["treatment"] == 0, "Working from office", "Working from home"
+)
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(6, 5.5))
+barchart_data.plot(kind="bar", x="treatment", stacked=True, ax=ax, width=0.9)
+plt.xlabel("")
+plt.ylabel("Share of employees (percent)")
+ax.tick_params(axis="x", labelrotation=0)
+ax.set_yticks(da.seq(0, 100, 25))
+
+handles, _ = ax.get_legend_handles_labels()
+plt.legend(
+    handles=[handles[1], handles[0]],  # reverse order of legend to match book
+    labels=["Quit", "Stayed"],
+    bbox_to_anchor=(1, 0.55),
+    frameon=False,
+)
+
+da.add_margin(ax, x=-0.05, y=0)
+```
+
+### Regression analysis 
+ Outcome variables: 1) quit firm during 8 months of experiment , 2) phone calls worked, for ordertakers
+
+```{python}
+# Outcomes by treatment
+
+# 1) Quit firm
+quitjobs
+```
+
+```{python}
+# 2) Phonecalls (ordertakers only)
+phonecalls1
+```
+
+### Regression 1: ATE estimates, no covariates
+
+```{python}
+reg1 = pf.feols("quitjob~treatment", data=data, vcov="HC1")
+reg2 = pf.feols(
+    "phonecalls1~treatment", data=data.loc[lambda x: x["ordertaker"] == 1], vcov="HC1"
+)
+```
+
+```{python}
+pf.etable(
+    [reg1, reg2],
+    model_heads=["Quit job", "Phone calls (thousand)"],
+    head_order="h",
+    labels={"Intercept": "Constant", "treatment": "Treatment group"},
+    show_se_type=False,
+    digits=2,
+)
+```
+
+### Regression 2: ATE estimates, with covariates of some unbalance
+
+```{python}
+reg3 = pf.feols(
+    "quitjob ~ treatment + married + children + internet", data=data, vcov="HC1"
+)
+reg4 = pf.feols(
+    "phonecalls1 ~ treatment + married + children",
+    data=data.loc[lambda x: x["ordertaker"] == 1],
+    vcov="HC1",
+)
+```
+
+```{python}
+pf.etable(
+    [reg3, reg4],
+    model_heads=["Quit job", "Phone calls (thousand)"],
+    head_order="h",
+    labels={
+        "Intercept": "Constant",
+        "treatment": "Treatment group",
+        "married": "Married",
+        "children": "Children",
+        "internet": "Internet at home",
+    },
+    show_se_type=False,
+    digits=2,
+)
+```
+
+
