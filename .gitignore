@@ -20,3 +20,5 @@ set-data-directory.do
 set-data-directory.R
 renv/
 .DS_Store
+*_files/
+*_cache/

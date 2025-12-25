@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.26">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Prepared for Gabor’s Data Analysis</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="ch02-hotels-data-prep_files/libs/clipboard/clipboard.min.js"></script>
+<script src="ch02-hotels-data-prep_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="ch02-hotels-data-prep_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="ch02-hotels-data-prep_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="ch02-hotels-data-prep_files/libs/quarto-html/popper.min.js"></script>
+<script src="ch02-hotels-data-prep_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="ch02-hotels-data-prep_files/libs/quarto-html/anchor.min.js"></script>
+<link href="ch02-hotels-data-prep_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="ch02-hotels-data-prep_files/libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="ch02-hotels-data-prep_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="ch02-hotels-data-prep_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="ch02-hotels-data-prep_files/libs/bootstrap/bootstrap-1e118674f8eeaf0dc11d6faf9a2d8791.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Prepared for Gabor’s Data Analysis</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="data-analysis-for-business-economics-and-policy" class="level3">
+<h3 class="anchored" data-anchor-id="data-analysis-for-business-economics-and-policy">Data Analysis for Business, Economics, and Policy</h3>
+<p>by Gabor Bekes and Gabor Kezdi</p>
+<p>Cambridge University Press 2021</p>
+<p><strong><a href="https://gabors-data-analysis.com/">gabors-data-analysis.com</a></strong></p>
+<p>License: Free to share, modify and use for educational purposes. Not to be used for commercial purposes.</p>
+</section>
+<section id="chapter-02" class="level3">
+<h3 class="anchored" data-anchor-id="chapter-02">Chapter 02</h3>
+<p><strong>CH02A Finding a good deal among hotels: data preparation</strong></p>
+<p>using the hotels-vienna dataset</p>
+<p>version 0.9.0 2025-08-14</p>
+<div id="229f4b9d" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> warnings</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">#warnings.filterwarnings("ignore")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="83dd121f" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Current script folder</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>current_path <span class="op">=</span> os.getcwd()</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>dirname <span class="op">=</span> current_path.split(<span class="st">"da_case_studies"</span>)[<span class="dv">0</span>]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># location folders</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>data_in <span class="op">=</span> dirname <span class="op">+</span> <span class="st">"da_data_repo/hotels-vienna"</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>data_out <span class="op">=</span> dirname <span class="op">+</span> <span class="st">"da_case_studies/ch02-hotels-data-prep/"</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>output <span class="op">=</span> dirname <span class="op">+</span> <span class="st">"da_case_studies/ch02-hotels-data-prep/output/"</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>func <span class="op">=</span> dirname <span class="op">+</span> <span class="st">"da_case_studies/ch00-tech-prep/"</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>sys.path.append(func)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="8e8bcca9" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Import the prewritten helper functions</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> py_helper_functions <span class="im">as</span> da</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="56cdf68b" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># we'll use both clean and raw files in this case study</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># separate data_in directpories for these two</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">#  same for options 1 and 2 (once you have set $data_in)</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>data_in_clean <span class="op">=</span> data_in <span class="op">+</span> <span class="st">"/clean/"</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>data_in_raw <span class="op">=</span>data_in <span class="op">+</span> <span class="st">"/raw/"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="read-data" class="level3">
+<h3 class="anchored" data-anchor-id="read-data">Read data</h3>
+<div id="d843420d" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># load in clean and tidy data and create workfile</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.read_csv(data_in_clean <span class="op">+</span> <span class="st">"hotels-vienna.csv"</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">#data = pd.read_csv("https://osf.io/y6jvb/download")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="47f01c39" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data[</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    [</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"hotel_id"</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"accommodation_type"</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"distance"</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"stars"</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating"</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating_count"</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"price"</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="9130e664" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># look at accomodation types</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"accommodation_type"</span>].value_counts(dropna<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>accommodation_type
+Hotel                  264
+Apartment              124
+Pension                 16
+Guest House              8
+Hostel                   6
+Bed and breakfast        4
+Apart-hotel              4
+Vacation home Condo      2
+Name: count, dtype: int64</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="table-1.1" class="level3">
+<h3 class="anchored" data-anchor-id="table-1.1">Table 1.1</h3>
+<hr>
+<div id="58c3ba1f" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>data.head()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<th data-quarto-table-cell-role="th">accommodation_type</th>
+<th data-quarto-table-cell-role="th">distance</th>
+<th data-quarto-table-cell-role="th">stars</th>
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th">rating_count</th>
+<th data-quarto-table-cell-role="th">price</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>21894</td>
+<td>Apartment</td>
+<td>2.7</td>
+<td>4.0</td>
+<td>4.4</td>
+<td>36.0</td>
+<td>81</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>21897</td>
+<td>Hotel</td>
+<td>1.7</td>
+<td>4.0</td>
+<td>3.9</td>
+<td>189.0</td>
+<td>81</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>21901</td>
+<td>Hotel</td>
+<td>1.4</td>
+<td>4.0</td>
+<td>3.7</td>
+<td>53.0</td>
+<td>85</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>21902</td>
+<td>Hotel</td>
+<td>1.7</td>
+<td>3.0</td>
+<td>4.0</td>
+<td>55.0</td>
+<td>83</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>21903</td>
+<td>Hotel</td>
+<td>1.2</td>
+<td>4.0</td>
+<td>3.9</td>
+<td>33.0</td>
+<td>82</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="table-2.2" class="level3">
+<h3 class="anchored" data-anchor-id="table-2.2">Table 2.2</h3>
+<hr>
+<div id="6b03b3aa" class="cell" data-execution_count="9">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># data types stored in the data file </span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co"># different way of "type", than in the book</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>data.dtypes</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<pre><code>hotel_id                int64
+accommodation_type     object
+distance              float64
+stars                 float64
+rating                float64
+rating_count          float64
+price                   int64
+dtype: object</code></pre>
+</div>
+</div>
+</section>
+<section id="bellondas-logic-decoder" class="level3">
+<h3 class="anchored" data-anchor-id="bellondas-logic-decoder">🕵️‍♀️ Bellonda’s Logic Decoder</h3>
+<p><strong>The Business Goal:</strong> To enforce “Data Strictness” early. We convert generic, memory-heavy text into efficient categories and ensure that missing ratings don’t crash our calculations by using nullable integers.</p>
+<p><strong>The Syntax Anatomy:</strong> * <code>data</code> → <strong>The Subject</strong> (Our raw dataframe) * <code>.astype()</code> → <strong>The Verb</strong> (Force-casting data types) * <code>{ 'column': 'type' }</code> → <strong>The Settings</strong> (The mapping of specific columns to their target technical formats)</p>
+<blockquote class="blockquote">
+<p><strong>💡 The Wisdom Check:</strong> distinct between <code>int64</code> (lower case) and <code>Int64</code> (capitalized). The lower-case version cannot handle <code>NaN</code> (missing values) and will throw errors. The Capitalized version is “Nullable” and safe for real-world, dirty data.</p>
+</blockquote>
+<div id="cd1465b7" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.astype(</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">'accommodation_type'</span>: <span class="st">'category'</span>,  <span class="co"># Optimize memory for repeating labels</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">'rating_count'</span>: <span class="st">'Int64'</span>,  <span class="co"># Whole numbers only, allowing for NaNs</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">'hotel_id'</span>: <span class="st">'str'</span>,  <span class="co"># IDs are labels, not math subjects</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify the cleanup</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>data.dtypes</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<pre><code>hotel_id                object
+accommodation_type    category
+distance               float64
+stars                  float64
+rating                 float64
+rating_count             Int64
+price                    int64
+dtype: object</code></pre>
+</div>
+</div>
+<div id="48b8fbfa" class="cell" data-execution_count="11">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>data.iloc[<span class="dv">1</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<pre><code>hotel_id              21897
+accommodation_type    Hotel
+distance                1.7
+stars                   4.0
+rating                  3.9
+rating_count            189
+price                    81
+Name: 1, dtype: object</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="table-2.3" class="level3">
+<h3 class="anchored" data-anchor-id="table-2.3">Table 2.3</h3>
+<hr>
+<div id="0b837135" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.loc[data[<span class="st">"accommodation_type"</span>] <span class="op">==</span> <span class="st">"Hotel"</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<section id="the-dimensions-cheatsheet" class="level4">
+<h4 class="anchored" data-anchor-id="the-dimensions-cheatsheet">📏 THE DIMENSIONS CHEATSHEET</h4>
+<p><strong>1. Total Dimensions (Tuple) -&gt; (Rows, Columns)</strong> <em>Use when: Checking the “Area” of the data.</em> <code>data.shape</code> # Output: (264, 8)</p>
+<p><strong>2. Just the Count (Rows) -&gt; Inventory Level</strong> <em>Use when: “N” count for stats or checking filter impact.</em> <code>data.shape[0]</code> # Output: 264 <code>len(data)</code> # Output: 264 (Faster shorthand)</p>
+<p><strong>3. Just the Width (Columns) -&gt; Feature Count</strong> <em>Use when: Checking if a merge added new variables.</em> <code>data.shape[1]</code> # Output: 8</p>
+<div id="0774d6bc" class="cell" data-execution_count="13">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>data.shape[<span class="dv">0</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<pre><code>264</code></pre>
+</div>
+</div>
+<div id="44f378ca" class="cell" data-execution_count="14">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>data[[<span class="st">"hotel_id"</span>,<span class="st">"price"</span>,<span class="st">"distance"</span>]].head(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<th data-quarto-table-cell-role="th">price</th>
+<th data-quarto-table-cell-role="th">distance</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">1</th>
+<td>21897</td>
+<td>81</td>
+<td>1.7</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2</th>
+<td>21901</td>
+<td>85</td>
+<td>1.4</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3</th>
+<td>21902</td>
+<td>83</td>
+<td>1.7</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="part-b-repeat-part-of-the-cleaning-code" class="level2">
+<h2 class="anchored" data-anchor-id="part-b-repeat-part-of-the-cleaning-code">PART B: repeat part of the cleaning code</h2>
+<p>using the raw csv data file includes some additional output *********************************************************</p>
+<p><em>IMPORT AND PREPARE DATA</em></p>
+<p>variables downoaded as string, often in form that is not helpful need to transform then to numbers that we can use</p>
+<div id="aff0e743" class="cell" data-execution_count="15">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.read_csv(data_in_raw <span class="op">+</span> <span class="st">"hotelbookingdata-vienna.csv"</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="co">#data = pd.read_csv( "https://osf.io/g5dmw/download" )</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>data.head()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">addresscountryname</th>
+<th data-quarto-table-cell-role="th">city_actual</th>
+<th data-quarto-table-cell-role="th">rating_reviewcount</th>
+<th data-quarto-table-cell-role="th">center1distance</th>
+<th data-quarto-table-cell-role="th">center1label</th>
+<th data-quarto-table-cell-role="th">center2distance</th>
+<th data-quarto-table-cell-role="th">center2label</th>
+<th data-quarto-table-cell-role="th">neighbourhood</th>
+<th data-quarto-table-cell-role="th">price</th>
+<th data-quarto-table-cell-role="th">price_night</th>
+<th data-quarto-table-cell-role="th">...</th>
+<th data-quarto-table-cell-role="th">accommodationtype</th>
+<th data-quarto-table-cell-role="th">guestreviewsrating</th>
+<th data-quarto-table-cell-role="th">scarce_room</th>
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<th data-quarto-table-cell-role="th">offer</th>
+<th data-quarto-table-cell-role="th">offer_cat</th>
+<th data-quarto-table-cell-role="th">year</th>
+<th data-quarto-table-cell-role="th">month</th>
+<th data-quarto-table-cell-role="th">weekend</th>
+<th data-quarto-table-cell-role="th">holiday</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>36.0</td>
+<td>2.7 miles</td>
+<td>City centre</td>
+<td>4.4 miles</td>
+<td>Donauturm</td>
+<td>17. Hernals</td>
+<td>81</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>_ACCOM_TYPE@Apartment</td>
+<td>4.4 /5</td>
+<td>1</td>
+<td>21894</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>189.0</td>
+<td>1.7 miles</td>
+<td>City centre</td>
+<td>3.8 miles</td>
+<td>Donauturm</td>
+<td>17. Hernals</td>
+<td>81</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>_ACCOM_TYPE@Hotel</td>
+<td>3.9 /5</td>
+<td>0</td>
+<td>21897</td>
+<td>1</td>
+<td>1-15% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>53.0</td>
+<td>1.4 miles</td>
+<td>City centre</td>
+<td>2.5 miles</td>
+<td>Donauturm</td>
+<td>Alsergrund</td>
+<td>85</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>_ACCOM_TYPE@Hotel</td>
+<td>3.7 /5</td>
+<td>0</td>
+<td>21901</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>55.0</td>
+<td>1.7 miles</td>
+<td>City centre</td>
+<td>2.5 miles</td>
+<td>Donauturm</td>
+<td>Alsergrund</td>
+<td>83</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>_ACCOM_TYPE@Hotel</td>
+<td>4 /5</td>
+<td>0</td>
+<td>21902</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>33.0</td>
+<td>1.2 miles</td>
+<td>City centre</td>
+<td>2.8 miles</td>
+<td>Donauturm</td>
+<td>Alsergrund</td>
+<td>82</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>_ACCOM_TYPE@Hotel</td>
+<td>3.9 /5</td>
+<td>1</td>
+<td>21903</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+
+<p>5 rows × 24 columns</p>
+</div>
+</div>
+</div>
+<div id="ed56c56a" class="cell" data-execution_count="16">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># # distance to center entered as string in miles with one decimal</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="co"># data["distance"] = data["center1distance"].str.split(" ").apply(lambda x: float(x[0]))</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="co"># data["distance_alter"] = (</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co">#     data["center2distance"].str.split(" ").apply(lambda x: float(x[0]))</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="f7a65ab8" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The Fast Way (Vectorized)</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"distance"</span>] <span class="op">=</span> (</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    data[<span class="st">"center1distance"</span>]</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>.split()      <span class="co"># 1. Splits on whitespace (returns a series of lists)</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>[<span class="dv">0</span>]           <span class="co"># 2. Vectorized grab of the first element</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    .astype(<span class="bu">float</span>)    <span class="co"># 3. Mass convert to float</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="ec6d95e2" class="cell" data-execution_count="18">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># data["accommodation_type"] = (</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="co">#     data["accommodationtype"].str.split("@").apply(lambda x: x[1]).str.strip()</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="c92c1413" class="cell" data-execution_count="19">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The Fast Way</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"accommodation_type"</span>] <span class="op">=</span> (</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    data[<span class="st">"accommodationtype"</span>]</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>.split(<span class="st">"@"</span>)   <span class="co"># 1. Split into lists</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>[<span class="dv">1</span>]           <span class="co"># 2. Vectorized grab of the second item (index 1)</span></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>.strip()      <span class="co"># 3. Clean up whitespace</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="b1581df2" class="cell" data-execution_count="20">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>data.head()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">addresscountryname</th>
+<th data-quarto-table-cell-role="th">city_actual</th>
+<th data-quarto-table-cell-role="th">rating_reviewcount</th>
+<th data-quarto-table-cell-role="th">center1distance</th>
+<th data-quarto-table-cell-role="th">center1label</th>
+<th data-quarto-table-cell-role="th">center2distance</th>
+<th data-quarto-table-cell-role="th">center2label</th>
+<th data-quarto-table-cell-role="th">neighbourhood</th>
+<th data-quarto-table-cell-role="th">price</th>
+<th data-quarto-table-cell-role="th">price_night</th>
+<th data-quarto-table-cell-role="th">...</th>
+<th data-quarto-table-cell-role="th">scarce_room</th>
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<th data-quarto-table-cell-role="th">offer</th>
+<th data-quarto-table-cell-role="th">offer_cat</th>
+<th data-quarto-table-cell-role="th">year</th>
+<th data-quarto-table-cell-role="th">month</th>
+<th data-quarto-table-cell-role="th">weekend</th>
+<th data-quarto-table-cell-role="th">holiday</th>
+<th data-quarto-table-cell-role="th">distance</th>
+<th data-quarto-table-cell-role="th">accommodation_type</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>36.0</td>
+<td>2.7 miles</td>
+<td>City centre</td>
+<td>4.4 miles</td>
+<td>Donauturm</td>
+<td>17. Hernals</td>
+<td>81</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>1</td>
+<td>21894</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+<td>2.7</td>
+<td>Apartment</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>189.0</td>
+<td>1.7 miles</td>
+<td>City centre</td>
+<td>3.8 miles</td>
+<td>Donauturm</td>
+<td>17. Hernals</td>
+<td>81</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>0</td>
+<td>21897</td>
+<td>1</td>
+<td>1-15% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+<td>1.7</td>
+<td>Hotel</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>53.0</td>
+<td>1.4 miles</td>
+<td>City centre</td>
+<td>2.5 miles</td>
+<td>Donauturm</td>
+<td>Alsergrund</td>
+<td>85</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>0</td>
+<td>21901</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+<td>1.4</td>
+<td>Hotel</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>55.0</td>
+<td>1.7 miles</td>
+<td>City centre</td>
+<td>2.5 miles</td>
+<td>Donauturm</td>
+<td>Alsergrund</td>
+<td>83</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>0</td>
+<td>21902</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+<td>1.7</td>
+<td>Hotel</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>Austria</td>
+<td>Vienna</td>
+<td>33.0</td>
+<td>1.2 miles</td>
+<td>City centre</td>
+<td>2.8 miles</td>
+<td>Donauturm</td>
+<td>Alsergrund</td>
+<td>82</td>
+<td>price for 1 night</td>
+<td>...</td>
+<td>1</td>
+<td>21903</td>
+<td>1</td>
+<td>15-50% offer</td>
+<td>2017</td>
+<td>11</td>
+<td>0</td>
+<td>0</td>
+<td>1.2</td>
+<td>Hotel</td>
+</tr>
+</tbody>
+</table>
+
+<p>5 rows × 26 columns</p>
+</div>
+</div>
+</div>
+<div id="23bb9aa4" class="cell" data-execution_count="21">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"nnight"</span>] <span class="op">=</span> data[<span class="st">"price_night"</span>].<span class="bu">str</span>.split(<span class="st">" "</span>).<span class="bu">apply</span>(<span class="kw">lambda</span> x: <span class="bu">int</span>(x[<span class="dv">2</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="386ef11f" class="cell" data-execution_count="22">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co"># # generate numerical variable of rating variable from string variable</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="co"># data["rating"] = (</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a><span class="co">#     data["guestreviewsrating"]</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="co">#     .str.split(" ")</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a><span class="co">#     .apply(lambda x: float(x[0]) if type(x) == list else None)</span></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="adc12a3a" class="cell" data-execution_count="23">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The Fast Way</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"rating"</span>] <span class="op">=</span> (</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    data[<span class="st">"guestreviewsrating"</span>]</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>.split(<span class="st">" "</span>)   <span class="co"># 1. Split into lists</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">str</span>[<span class="dv">0</span>]           <span class="co"># 2. Grab the first chunk ("4.5" from "4.5 / 5")</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>    .astype(<span class="bu">float</span>)    <span class="co"># 3. Convert to number</span></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="ef2d208d" class="cell" data-execution_count="24">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># check: frequency table of all values incl. missing varlues</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>da.tabulate(data[<span class="st">"rating"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="24">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Freq.</th>
+<th data-quarto-table-cell-role="th">Perc.</th>
+<th data-quarto-table-cell-role="th">Cum</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">1.0</th>
+<td>3</td>
+<td>0.007</td>
+<td>0.007</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2.0</th>
+<td>4</td>
+<td>0.009</td>
+<td>0.016</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2.2</th>
+<td>4</td>
+<td>0.009</td>
+<td>0.026</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2.5</th>
+<td>1</td>
+<td>0.002</td>
+<td>0.028</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2.7</th>
+<td>2</td>
+<td>0.005</td>
+<td>0.033</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3.0</th>
+<td>12</td>
+<td>0.028</td>
+<td>0.060</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.2</th>
+<td>14</td>
+<td>0.033</td>
+<td>0.093</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3.4</th>
+<td>6</td>
+<td>0.014</td>
+<td>0.107</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.5</th>
+<td>30</td>
+<td>0.070</td>
+<td>0.177</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3.7</th>
+<td>43</td>
+<td>0.100</td>
+<td>0.277</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.9</th>
+<td>27</td>
+<td>0.063</td>
+<td>0.340</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.0</th>
+<td>61</td>
+<td>0.142</td>
+<td>0.481</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.1</th>
+<td>47</td>
+<td>0.109</td>
+<td>0.591</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.3</th>
+<td>36</td>
+<td>0.084</td>
+<td>0.674</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.4</th>
+<td>31</td>
+<td>0.072</td>
+<td>0.747</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.5</th>
+<td>44</td>
+<td>0.102</td>
+<td>0.849</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.6</th>
+<td>10</td>
+<td>0.023</td>
+<td>0.872</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.8</th>
+<td>12</td>
+<td>0.028</td>
+<td>0.900</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.9</th>
+<td>2</td>
+<td>0.005</td>
+<td>0.905</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5.0</th>
+<td>6</td>
+<td>0.014</td>
+<td>0.919</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">NaN</th>
+<td>35</td>
+<td>0.081</td>
+<td>1.000</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="6f40a9fb" class="cell" data-execution_count="25">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># check: frequency table of all values incl. missing varlues</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>da.tabulate(data[<span class="st">"rating_reviewcount"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="25">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Freq.</th>
+<th data-quarto-table-cell-role="th">Perc.</th>
+<th data-quarto-table-cell-role="th">Cum</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">rating_reviewcount</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">1.0</th>
+<td>15</td>
+<td>0.035</td>
+<td>0.035</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2.0</th>
+<td>9</td>
+<td>0.021</td>
+<td>0.056</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.0</th>
+<td>9</td>
+<td>0.021</td>
+<td>0.077</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.0</th>
+<td>1</td>
+<td>0.002</td>
+<td>0.079</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">5.0</th>
+<td>5</td>
+<td>0.012</td>
+<td>0.091</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">...</th>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">923.0</th>
+<td>1</td>
+<td>0.002</td>
+<td>0.912</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">985.0</th>
+<td>1</td>
+<td>0.002</td>
+<td>0.914</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">1122.0</th>
+<td>1</td>
+<td>0.002</td>
+<td>0.916</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1541.0</th>
+<td>1</td>
+<td>0.002</td>
+<td>0.919</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">NaN</th>
+<td>35</td>
+<td>0.081</td>
+<td>1.000</td>
+</tr>
+</tbody>
+</table>
+
+<p>225 rows × 3 columns</p>
+</div>
+</div>
+</div>
+<div id="1deabf6a" class="cell" data-execution_count="26">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"rating_count"</span>] <span class="op">=</span> data[<span class="st">"rating_reviewcount"</span>].<span class="bu">apply</span>(<span class="bu">float</span>)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"rating_count"</span>].describe().to_frame().T</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="26">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">count</th>
+<th data-quarto-table-cell-role="th">mean</th>
+<th data-quarto-table-cell-role="th">std</th>
+<th data-quarto-table-cell-role="th">min</th>
+<th data-quarto-table-cell-role="th">25%</th>
+<th data-quarto-table-cell-role="th">50%</th>
+<th data-quarto-table-cell-role="th">75%</th>
+<th data-quarto-table-cell-role="th">max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">rating_count</th>
+<td>395.0</td>
+<td>155.293671</td>
+<td>191.296684</td>
+<td>1.0</td>
+<td>26.5</td>
+<td>84.0</td>
+<td>203.0</td>
+<td>1541.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p><em>RENAME VARIABLES</em></p>
+<div id="04d7eda2" class="cell" data-execution_count="27">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.rename(</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>{</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating2_ta"</span>: <span class="st">"ratingta"</span>,</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating2_ta_reviewcount"</span>: <span class="st">"ratingta_count"</span>,</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"addresscountryname"</span>: <span class="st">"country"</span>,</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"s_city"</span>: <span class="st">"city"</span>,</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"starrating"</span>: <span class="st">"stars"</span>,</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="9f96ed99" class="cell" data-execution_count="28">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># # ---------------------------------------------------------</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="co"># #  THE SPELL: da.tabulate()</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="co"># # ---------------------------------------------------------</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="co"># #import py_helper_functions as da</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a><span class="co"># # 1. The Basic Usage (Default)</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a><span class="co"># # Best for: Discrete categories (e.g., "Red", "Blue") or Integers (1, 2, 3)</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a><span class="co"># # Behavior: Keeps NaN values by default so you see missing data.</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a><span class="co"># da.tabulate(data["column_name"])</span></span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a><span class="co"># # 2. The "Clean" Usage (Drop NaNs)</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a><span class="co"># # Best for: When you only care about valid data points.</span></span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a><span class="co"># da.tabulate(data["column_name"], drop_missing=True)</span></span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a><span class="co"># # 3. The "Continuous Data" Hack</span></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a><span class="co"># # Best for: Prices, exact ratings (4.2), or anything with decimals.</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a><span class="co"># # Gotcha: You MUST round or bin continuous data first, or the table will be huge.</span></span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a><span class="co"># da.tabulate(data["price"].round(-1)) # Round to nearest 10</span></span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a><span class="co"># # OR</span></span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a><span class="co"># da.tabulate(pd.cut(data["price"], bins=5)) # Create 5 equal bins</span></span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a><span class="co"># # ---------------------------------------------------------</span></span>
+<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a><span class="co"># #  OUTPUT COLUMNS EXPLAINED</span></span>
+<span id="cb33-24"><a href="#cb33-24" aria-hidden="true" tabindex="-1"></a><span class="co"># # ---------------------------------------------------------</span></span>
+<span id="cb33-25"><a href="#cb33-25" aria-hidden="true" tabindex="-1"></a><span class="co"># # Freq. : How many times this value appears (Raw Count)</span></span>
+<span id="cb33-26"><a href="#cb33-26" aria-hidden="true" tabindex="-1"></a><span class="co"># # Perc. : The portion of the total this value represents (Probability Mass)</span></span>
+<span id="cb33-27"><a href="#cb33-27" aria-hidden="true" tabindex="-1"></a><span class="co"># # Cum.  : Running total of Perc. (Cumulative Distribution)</span></span>
+<span id="cb33-28"><a href="#cb33-28" aria-hidden="true" tabindex="-1"></a><span class="co"># # Index : The values themselves, sorted logically (Low -&gt; High)</span></span>
+<span id="cb33-29"><a href="#cb33-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-30"><a href="#cb33-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-31"><a href="#cb33-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-32"><a href="#cb33-32" aria-hidden="true" tabindex="-1"></a><span class="co"># # look at key variables</span></span>
+<span id="cb33-33"><a href="#cb33-33" aria-hidden="true" tabindex="-1"></a><span class="co"># da.tabulate(data["stars"])</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="0c819e7c" class="cell" data-execution_count="29">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>da.tabulate(data[<span class="st">"rating"</span>],drop_missing<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="29">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Freq.</th>
+<th data-quarto-table-cell-role="th">Perc.</th>
+<th data-quarto-table-cell-role="th">Cum</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">1.0</th>
+<td>3</td>
+<td>0.008</td>
+<td>0.008</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2.0</th>
+<td>4</td>
+<td>0.010</td>
+<td>0.018</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2.2</th>
+<td>4</td>
+<td>0.010</td>
+<td>0.028</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2.5</th>
+<td>1</td>
+<td>0.003</td>
+<td>0.030</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2.7</th>
+<td>2</td>
+<td>0.005</td>
+<td>0.035</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3.0</th>
+<td>12</td>
+<td>0.030</td>
+<td>0.066</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.2</th>
+<td>14</td>
+<td>0.035</td>
+<td>0.101</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3.4</th>
+<td>6</td>
+<td>0.015</td>
+<td>0.116</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.5</th>
+<td>30</td>
+<td>0.076</td>
+<td>0.192</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3.7</th>
+<td>43</td>
+<td>0.109</td>
+<td>0.301</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3.9</th>
+<td>27</td>
+<td>0.068</td>
+<td>0.370</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.0</th>
+<td>61</td>
+<td>0.154</td>
+<td>0.524</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.1</th>
+<td>47</td>
+<td>0.119</td>
+<td>0.643</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.3</th>
+<td>36</td>
+<td>0.091</td>
+<td>0.734</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.4</th>
+<td>31</td>
+<td>0.078</td>
+<td>0.813</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.5</th>
+<td>44</td>
+<td>0.111</td>
+<td>0.924</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.6</th>
+<td>10</td>
+<td>0.025</td>
+<td>0.949</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4.8</th>
+<td>12</td>
+<td>0.030</td>
+<td>0.980</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4.9</th>
+<td>2</td>
+<td>0.005</td>
+<td>0.985</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5.0</th>
+<td>6</td>
+<td>0.015</td>
+<td>1.000</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="5090b24f" class="cell" data-execution_count="30">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.drop(</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>[</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"center2distance"</span>,</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"center1distance"</span>,</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"price_night"</span>,</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"guestreviewsrating"</span>,</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating_reviewcount"</span>,</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<hr>
+<section id="table-2.10" class="level3">
+<h3 class="anchored" data-anchor-id="table-2.10">Table 2.10</h3>
+<hr>
+</section>
+<section id="bellondas-logic-decoder-1" class="level3">
+<h3 class="anchored" data-anchor-id="bellondas-logic-decoder-1">🕵️‍♀️ Bellonda’s Logic Decoder</h3>
+<p><strong>The Business Goal:</strong> Detect data quality issues by isolating hotel entities that appear multiple times in our dataset. We must view <em>all</em> instances to determine if they are redundant duplicates or conflicting data points.</p>
+<p><strong>The Syntax Anatomy:</strong> * <code>sort_values(by=...)</code> → <strong>The Prep</strong>: Groups identical IDs together visually for easier human inspection. * <code>duplicated(keep=False)</code> → <strong>The Dragnet</strong>: The critical setting. Instead of hiding the original, it marks <strong>ALL</strong> occurrences (original + copies) as <code>True</code> so we can compare them side-by-side. * <code>[[list_of_cols]]</code> → <strong>The Lens</strong>: Restricts our view to only the “vital signs” (price, stars) needed to make a decision on which record to keep.</p>
+<blockquote class="blockquote">
+<p><strong>💡 The Wisdom Check:</strong> Never use generic methods blindly. Default <code>duplicated()</code> hides the problem (the original row). Using <code>keep=False</code> is the only way to perform a true audit of the conflict.</p>
+</blockquote>
+<div id="c24390c2" class="cell" data-execution_count="31">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Look for perfect duplicates</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.sort_values(by<span class="op">=</span>[<span class="st">"hotel_id"</span>])</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>data[data[<span class="st">"hotel_id"</span>].duplicated(keep<span class="op">=</span><span class="va">False</span>)][</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    [</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"hotel_id"</span>,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"accommodation_type"</span>,</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"price"</span>,</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"distance"</span>,</span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"stars"</span>,</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating"</span>,</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating_count"</span>,</span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="31">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<th data-quarto-table-cell-role="th">accommodation_type</th>
+<th data-quarto-table-cell-role="th">price</th>
+<th data-quarto-table-cell-role="th">distance</th>
+<th data-quarto-table-cell-role="th">stars</th>
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th">rating_count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">128</th>
+<td>22050</td>
+<td>Hotel</td>
+<td>242</td>
+<td>0.0</td>
+<td>4.0</td>
+<td>4.8</td>
+<td>404.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">129</th>
+<td>22050</td>
+<td>Hotel</td>
+<td>242</td>
+<td>0.0</td>
+<td>4.0</td>
+<td>4.8</td>
+<td>404.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">242</th>
+<td>22185</td>
+<td>Hotel</td>
+<td>84</td>
+<td>0.8</td>
+<td>3.0</td>
+<td>2.2</td>
+<td>3.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">241</th>
+<td>22185</td>
+<td>Hotel</td>
+<td>84</td>
+<td>0.8</td>
+<td>3.0</td>
+<td>2.2</td>
+<td>3.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="b6e3d8fe" class="cell" data-execution_count="32">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co"># drop the duplicate values</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.drop_duplicates()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<hr>
+</section>
+<section id="missing-values-in-text" class="level3">
+<h3 class="anchored" data-anchor-id="missing-values-in-text">Missing values in text</h3>
+<hr>
+<p>### 🕵️‍♀️ Bellonda’s Logic Decoder <strong>The Business Goal:</strong> Perform a rapid “Health Check” on all numerical variables. We need to instantly spot outliers (strange Max values), missing data (low Counts), or weird distributions (Mean vs.&nbsp;Median) without scrolling horizontally.</p>
+<p><strong>The Syntax Anatomy:</strong> * <code>describe()</code> → <strong>The Calculator</strong>: Generates the standard summary statistics (Count, Mean, Std Dev, Min/Max, Percentiles). * <code>transpose()</code> → <strong>The Pivot</strong>: Flips the table so variables are rows and stats are columns.</p>
+<blockquote class="blockquote">
+<p><strong>💡 The Wisdom Check:</strong> Always Transpose. Humans read lists from Top-to-Bottom better than Left-to-Right. If your dataset has 50 columns, <code>describe()</code> without <code>transpose()</code> is unreadable.</p>
+</blockquote>
+<div id="f5a3c9f2" class="cell" data-execution_count="33">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># data.describe().transpose()</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>data.describe().T</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="33">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">count</th>
+<th data-quarto-table-cell-role="th">mean</th>
+<th data-quarto-table-cell-role="th">std</th>
+<th data-quarto-table-cell-role="th">min</th>
+<th data-quarto-table-cell-role="th">25%</th>
+<th data-quarto-table-cell-role="th">50%</th>
+<th data-quarto-table-cell-role="th">75%</th>
+<th data-quarto-table-cell-role="th">max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">price</th>
+<td>428.0</td>
+<td>131.366822</td>
+<td>91.580545</td>
+<td>27.0</td>
+<td>83.00</td>
+<td>109.5</td>
+<td>146.00</td>
+<td>1012.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">stars</th>
+<td>428.0</td>
+<td>3.434579</td>
+<td>0.772278</td>
+<td>1.0</td>
+<td>3.00</td>
+<td>3.5</td>
+<td>4.00</td>
+<td>5.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">ratingta</th>
+<td>325.0</td>
+<td>3.990769</td>
+<td>0.482638</td>
+<td>2.0</td>
+<td>3.50</td>
+<td>4.0</td>
+<td>4.50</td>
+<td>5.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">ratingta_count</th>
+<td>325.0</td>
+<td>556.516923</td>
+<td>586.874582</td>
+<td>2.0</td>
+<td>129.00</td>
+<td>335.0</td>
+<td>811.00</td>
+<td>3171.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">scarce_room</th>
+<td>428.0</td>
+<td>0.598131</td>
+<td>0.490850</td>
+<td>0.0</td>
+<td>0.00</td>
+<td>1.0</td>
+<td>1.00</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<td>428.0</td>
+<td>22153.502336</td>
+<td>146.858477</td>
+<td>21894.0</td>
+<td>22027.75</td>
+<td>22155.5</td>
+<td>22279.25</td>
+<td>22409.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">offer</th>
+<td>428.0</td>
+<td>0.679907</td>
+<td>0.467058</td>
+<td>0.0</td>
+<td>0.00</td>
+<td>1.0</td>
+<td>1.00</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">year</th>
+<td>428.0</td>
+<td>2017.000000</td>
+<td>0.000000</td>
+<td>2017.0</td>
+<td>2017.00</td>
+<td>2017.0</td>
+<td>2017.00</td>
+<td>2017.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">month</th>
+<td>428.0</td>
+<td>11.000000</td>
+<td>0.000000</td>
+<td>11.0</td>
+<td>11.00</td>
+<td>11.0</td>
+<td>11.00</td>
+<td>11.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">weekend</th>
+<td>428.0</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.0</td>
+<td>0.00</td>
+<td>0.0</td>
+<td>0.00</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">holiday</th>
+<td>428.0</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.0</td>
+<td>0.00</td>
+<td>0.0</td>
+<td>0.00</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">distance</th>
+<td>428.0</td>
+<td>1.658879</td>
+<td>1.595673</td>
+<td>0.0</td>
+<td>0.70</td>
+<td>1.3</td>
+<td>2.00</td>
+<td>13.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">nnight</th>
+<td>428.0</td>
+<td>1.000000</td>
+<td>0.000000</td>
+<td>1.0</td>
+<td>1.00</td>
+<td>1.0</td>
+<td>1.00</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">rating</th>
+<td>393.0</td>
+<td>3.970992</td>
+<td>0.577444</td>
+<td>1.0</td>
+<td>3.70</td>
+<td>4.0</td>
+<td>4.40</td>
+<td>5.0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">rating_count</th>
+<td>393.0</td>
+<td>155.048346</td>
+<td>191.217435</td>
+<td>1.0</td>
+<td>27.00</td>
+<td>84.0</td>
+<td>203.00</td>
+<td>1541.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="36288965" class="cell" data-execution_count="34">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">'rating'</span>].isnull().<span class="bu">sum</span>())</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">'misrating'</span>] <span class="op">=</span> data[<span class="st">'rating'</span>].isnull()</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="co"># we cant use data.describe(include='all').T because it have false when rating wasnt null</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>35</code></pre>
+</div>
+</div>
+<div id="e25368ae" class="cell" data-execution_count="35">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>da.tabulate(data[<span class="st">"misrating"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="35">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Freq.</th>
+<th data-quarto-table-cell-role="th">Perc.</th>
+<th data-quarto-table-cell-role="th">Cum</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">misrating</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">False</th>
+<td>393</td>
+<td>0.918</td>
+<td>0.918</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">True</th>
+<td>35</td>
+<td>0.082</td>
+<td>1.000</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="bellondas-logic-decoder-2" class="level3">
+<h3 class="anchored" data-anchor-id="bellondas-logic-decoder-2">🕵️‍♀️ Bellonda’s Logic Decoder</h3>
+<p><strong>The Business Goal:</strong> Check for <strong>Systematic Bias</strong>. We suspect missing ratings aren’t random accidents. This table reveals if specific business segments (like ‘Apartments’) are disproportionately responsible for the missing data.</p>
+<p><strong>The Syntax Anatomy:</strong> * <code>pd.crosstab(row, col)</code> → <strong>The Matrix</strong>: Counts the intersection of two categorical variables. * <code>row</code> (Accom Type) vs <code>col</code> (Misrating) → <strong>The X-Ray</strong>: Breaks down our missing data flag by business category. * <code>margins=True</code> → <strong>The Context</strong>: Adds “All” (Subtotals). Without this, we can’t calculate percentages or judge the severity of the count.</p>
+<blockquote class="blockquote">
+<p><strong>💡 The Wisdom Check:</strong> Absolute numbers lie. “100 missing values” sounds the same as “100 missing values.” But 100 out of 200 (50%) vs.&nbsp;100 out of 1,000,000 (0.01%) are completely different business problems. Always use <code>margins=True</code>.</p>
+</blockquote>
+<div id="84d54533" class="cell" data-execution_count="36">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>pd.crosstab(data[<span class="st">'accommodation_type'</span>], data[<span class="st">'misrating'</span>], margins<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="36">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">misrating</th>
+<th data-quarto-table-cell-role="th">False</th>
+<th data-quarto-table-cell-role="th">True</th>
+<th data-quarto-table-cell-role="th">All</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">accommodation_type</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Apart-hotel</th>
+<td>4</td>
+<td>0</td>
+<td>4</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Apartment</th>
+<td>92</td>
+<td>32</td>
+<td>124</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Bed and breakfast</th>
+<td>4</td>
+<td>0</td>
+<td>4</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Guest House</th>
+<td>7</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Hostel</th>
+<td>6</td>
+<td>0</td>
+<td>6</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Hotel</th>
+<td>263</td>
+<td>1</td>
+<td>264</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Pension</th>
+<td>16</td>
+<td>0</td>
+<td>16</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Vacation home Condo</th>
+<td>1</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">All</th>
+<td>393</td>
+<td>35</td>
+<td>428</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="bellondas-logic-decoder-3" class="level3">
+<h3 class="anchored" data-anchor-id="bellondas-logic-decoder-3">🕵️‍♀️ Bellonda’s Logic Decoder</h3>
+<p><strong>The Business Goal:</strong> value-based Impact Analysis. We know <em>where</em> data is missing (frequency), now we check if it affects <em>Revenue</em> (Price). We are comparing the average price of labeled vs.&nbsp;unlabeled data to check for “Selection Bias” (e.g., “Cheaper hotels have more missing data”).</p>
+<p><strong>The Syntax Anatomy:</strong> * <code>values=</code> + <code>aggfunc=</code> → <strong>The Pivot</strong>: These must always appear together. * <code>values</code>: The column containing the numbers we want to crunch (Price). * <code>aggfunc</code>: The math operation to apply (Mean/Average). * <code>margins=True</code> with <code>mean</code> → <strong>The Weighted Average</strong>: Be careful! The “All” row here isn’t a sum; it is the average price of the entire category.</p>
+<blockquote class="blockquote">
+<p><strong>💡 The Wisdom Check:</strong> Defines the difference between a “Data Janitor” and a “Data Scientist.” The Janitor counts the missing rows. The Scientist calculates if the missing rows represent a specific economic segment (Budget vs.&nbsp;Luxury).</p>
+</blockquote>
+<div id="52d4ceb2" class="cell" data-execution_count="37">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>pd.crosstab(</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    index<span class="op">=</span>data[<span class="st">"accommodation_type"</span>],</span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>data[<span class="st">"misrating"</span>],</span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>    values<span class="op">=</span>data[<span class="st">"price"</span>],</span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>    aggfunc<span class="op">=</span><span class="st">"mean"</span>,</span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>    margins<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>).<span class="bu">round</span>(<span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="37">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">misrating</th>
+<th data-quarto-table-cell-role="th">False</th>
+<th data-quarto-table-cell-role="th">True</th>
+<th data-quarto-table-cell-role="th">All</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">accommodation_type</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Apart-hotel</th>
+<td>121.25</td>
+<td>NaN</td>
+<td>121.25</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Apartment</th>
+<td>136.45</td>
+<td>179.06</td>
+<td>147.44</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Bed and breakfast</th>
+<td>118.25</td>
+<td>NaN</td>
+<td>118.25</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Guest House</th>
+<td>71.00</td>
+<td>103.00</td>
+<td>75.00</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Hostel</th>
+<td>53.67</td>
+<td>NaN</td>
+<td>53.67</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Hotel</th>
+<td>130.02</td>
+<td>106.00</td>
+<td>129.93</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Pension</th>
+<td>96.06</td>
+<td>NaN</td>
+<td>96.06</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Vacation home Condo</th>
+<td>107.00</td>
+<td>116.00</td>
+<td>111.50</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">All</th>
+<td>127.66</td>
+<td>173.00</td>
+<td>131.37</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="6a71c3f0" class="cell" data-execution_count="38">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>data.loc[</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>    (data[<span class="st">"misrating"</span>] <span class="op">==</span> <span class="dv">1</span>) <span class="op">&amp;</span> (data[<span class="st">"accommodation_type"</span>] <span class="op">==</span> <span class="st">"Hotel"</span>),</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>    [</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"hotel_id"</span>,</span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"accommodation_type"</span>,</span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"price"</span>,</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"distance"</span>,</span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"stars"</span>,</span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating"</span>,</span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rating_count"</span>,</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="38">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">hotel_id</th>
+<th data-quarto-table-cell-role="th">accommodation_type</th>
+<th data-quarto-table-cell-role="th">price</th>
+<th data-quarto-table-cell-role="th">distance</th>
+<th data-quarto-table-cell-role="th">stars</th>
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th">rating_count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">14</th>
+<td>21916</td>
+<td>Hotel</td>
+<td>106</td>
+<td>0.7</td>
+<td>2.5</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
