@@ -3,24 +3,23 @@ title: Prepared for Gabor's Data Analysis
 jupyter: python3
 ---
 
-
 ### Data Analysis for Business, Economics, and Policy
-by Gabor Bekes and  Gabor Kezdi
- 
+
+by Gabor Bekes and Gabor Kezdi
+
 Cambridge University Press 2021
 
-**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+[**gabors-data-analysis.com**](https://gabors-data-analysis.com/)
 
- License: Free to share, modify and use for educational purposes. 
- Not to be used for commercial purposes.
+License: Free to share, modify and use for educational purposes. Not to be used for commercial purposes.
 
 ### Chapter 18
+
 **CH18B Forecasting a home price index**
 
 using case-schiller-la dataset
 
 version 0.9.0 2025-08-14
-
 
 ```{python}
 import os
@@ -609,6 +608,7 @@ rmse_holdout
 ```
 
 ### EXTERNAL VALIDITY
+
 ### do the prediction for an extra year
 
 ```{python}
@@ -667,5 +667,3 @@ errsq = np.square(data_holdout.p.values - forecast_holdout_best.p_pred)
 rmse_holdout = np.mean(errsq)
 rmse_holdout
 ```
-
-

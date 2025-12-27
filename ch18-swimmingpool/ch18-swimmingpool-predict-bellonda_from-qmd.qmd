@@ -3,42 +3,33 @@ title: Prepared for Gabor's Data Analysis
 jupyter: python3
 ---
 
-
 ### Data Analysis for Business, Economics, and Policy
-by Gabor Bekes and  Gabor Kezdi
- 
+
+by Gabor Bekes and Gabor Kezdi
+
 Cambridge University Press 2021
 
-**[gabors-data-analysis.com ](https://gabors-data-analysis.com/)**
+[**gabors-data-analysis.com**](https://gabors-data-analysis.com/)
 
- License: Free to share, modify and use for educational purposes. 
- Not to be used for commercial purposes.
+License: Free to share, modify and use for educational purposes. Not to be used for commercial purposes.
 
 ### Chapter 18
+
 **CH18 Forecasting daily ticket sales for a swimming pool**
 
 using swim data
 
 version 0.9.0 2025-08-14
 
-
 ### 🐍 Bellonda's Decoder: The Setup Phase
 
-**1. The "Why are we doing this?"**
-Before we can predict ticket sales, we need to equip our character (the Python script) with skills. We're loading libraries: `pandas` for tables, `numpy` for math, and `seaborn` for pretty pictures.
+**1. The "Why are we doing this?"** Before we can predict ticket sales, we need to equip our character (the Python script) with skills. We're loading libraries: `pandas` for tables, `numpy` for math, and `seaborn` for pretty pictures.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `import ... as ...` | **The Alias** | "Load this library but call it by a nickname so I don't have to type `pandas` 500 times." |
-| `warnings.filterwarnings` | **The Silencer** | "Tell Python to shut up about minor complaints so our output remains clean." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `import ... as ...` \| **The Alias** \| "Load this library but call it by a nickname so I don't have to type `pandas` 500 times." \| \| `warnings.filterwarnings` \| **The Silencer** \| "Tell Python to shut up about minor complaints so our output remains clean." \|
 
-**3. 👔 The Manager Translation**
-"We are setting up the software environment with the necessary tools for analysis."
+**3. 👔 The Manager Translation** "We are setting up the software environment with the necessary tools for analysis."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** If you don't install these libraries (`pip install pandas pyfixest`), this cell will crash immediately.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** If you don't install these libraries (`pip install pandas pyfixest`), this cell will crash immediately.
 
 ```{python}
 # ---------------------------------------------------------
@@ -63,21 +54,13 @@ warnings.filterwarnings("ignore")
 
 ### 🐍 Bellonda's Decoder: The GPS Setup
 
-**1. The "Why are we doing this?"**
-We need to tell Python exactly where our data lives (`data_in`) and where to dump our results (`output`). Hardcoding paths is for amateurs; we build them dynamically so they work on any machine.
+**1. The "Why are we doing this?"** We need to tell Python exactly where our data lives (`data_in`) and where to dump our results (`output`). Hardcoding paths is for amateurs; we build them dynamically so they work on any machine.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `os.getcwd()` | **The Compass** | "Where am I right now?" |
-| `sys.path.append()` | **The Bridge** | "Add this new folder to the list of places Python looks for code." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `os.getcwd()` \| **The Compass** \| "Where am I right now?" \| \| `sys.path.append()` \| **The Bridge** \| "Add this new folder to the list of places Python looks for code." \|
 
-**3. 👔 The Manager Translation**
-"Configuring file directories so the automation runs smoothly on any computer."
+**3. 👔 The Manager Translation** "Configuring file directories so the automation runs smoothly on any computer."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** `os.getcwd()` depends on where you *run* the script from. If you run this from a different folder, all your paths might break!
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** `os.getcwd()` depends on where you *run* the script from. If you run this from a different folder, all your paths might break!
 
 ```{python}
 # ---------------------------------------------------------
@@ -99,16 +82,11 @@ sys.path.append(func)
 
 ### 🐍 Bellonda's Decoder: The Interior Decorator
 
-**1. The "Why are we doing this?"**
-Default matplotlib charts are ugly. We are importing a custom theme helper (`py_helper_functions`) to make our charts look professional (and consistent with the book).
+**1. The "Why are we doing this?"** Default matplotlib charts are ugly. We are importing a custom theme helper (`py_helper_functions`) to make our charts look professional (and consistent with the book).
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `sns.set_theme()` | **The Vibe** | "Change the global defaults (colors, fonts) for all future plots." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `sns.set_theme()` \| **The Vibe** \| "Change the global defaults (colors, fonts) for all future plots." \|
 
-**3. 👔 The Manager Translation**
-"Applying our corporate branding/style guide to the charts."
+**3. 👔 The Manager Translation** "Applying our corporate branding/style guide to the charts."
 
 ```{python}
 import py_helper_functions as da
@@ -117,27 +95,17 @@ import py_helper_functions as da
 sns.set_theme(rc=da.da_theme, palette=da.color)
 ```
 
-
-
 ### Read data
 
 ### 🐍 Bellonda's Decoder: The Ingestion (With a Twist)
 
-**1. The "Why are we doing this?"**
-We are loading the raw data. BUT, we are doing something specific: `parse_dates`. If we don't do this, dates are just text strings, and we can't do math with them.
+**1. The "Why are we doing this?"** We are loading the raw data. BUT, we are doing something specific: `parse_dates`. If we don't do this, dates are just text strings, and we can't do math with them.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `pd.read_csv()` | **The Loader** | "Open this text file and turn it into a DataFrame." |
-| `parse_dates=['date']` | **The Converter** | "Find the column named 'date' and instantly turn it into actual Time objects." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `pd.read_csv()` \| **The Loader** \| "Open this text file and turn it into a DataFrame." \| \| `parse_dates=['date']` \| **The Converter** \| "Find the column named 'date' and instantly turn it into actual Time objects." \|
 
-**3. 👔 The Manager Translation**
-"Importing the sales records."
+**3. 👔 The Manager Translation** "Importing the sales records."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** If you forget `parse_dates`, you'll have to manually convert it later with `pd.to_datetime()`. Do it now and save time.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** If you forget `parse_dates`, you'll have to manually convert it later with `pd.to_datetime()`. Do it now and save time.
 
 ```{python}
 # Reading the scroll (CSV) and interpreting the "date" runes immediately
@@ -147,16 +115,11 @@ daily_agg = pd.read_csv(os.path.join(data_in, "swim_work.csv"), parse_dates=["da
 
 ### 🐍 Bellonda's Decoder: The Vibe Check
 
-**1. The "Why are we doing this?"**
-Never trust a clear pipeline. Always look at the first few rows to make sure the data loaded correctly and isn't garbage.
+**1. The "Why are we doing this?"** Never trust a clear pipeline. Always look at the first few rows to make sure the data loaded correctly and isn't garbage.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.head()` | **The Peek** | "Show me the top 5 rows." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.head()` \| **The Peek** \| "Show me the top 5 rows." \|
 
-**3. 👔 The Manager Translation**
-"Verifying data integrity."
+**3. 👔 The Manager Translation** "Verifying data integrity."
 
 ```{python}
 # Inspecting the head
@@ -164,39 +127,23 @@ Never trust a clear pipeline. Always look at the first few rows to make sure the
 daily_agg.head()
 ```
 
-
-
 ### 🐍 Bellonda's Decoder: The Butcher Shop (Date Chopping)
 
-**1. The "Why are we doing this?"**
-We can't feed a raw date like "2015-01-01" into a math model. It gets confused. We need to chop it up into pieces it understands: "It's a Thursday", "It's January", "It's 2015".
+**1. The "Why are we doing this?"** We can't feed a raw date like "2015-01-01" into a math model. It gets confused. We need to chop it up into pieces it understands: "It's a Thursday", "It's January", "It's 2015".
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.dt` | **The Accessor** | "Unlock the special time-travel methods for this column." |
-| `.dt.dayofweek` | **The Extraction** | "Give me 0 for Monday, 6 for Sunday." |
-| `.isin([6, 7])` | **The Trap** | "Check if the value is INSIDE this list (Saturday or Sunday)." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.dt` \| **The Accessor** \| "Unlock the special time-travel methods for this column." \| \| `.dt.dayofweek` \| **The Extraction** \| "Give me 0 for Monday, 6 for Sunday." \| \| `.isin([6, 7])` \| **The Trap** \| "Check if the value is INSIDE this list (Saturday or Sunday)." \|
 
-**3. 👔 The Manager Translation**
-"Breaking down the dates to analyze performance by day of week and month."
+**3. 👔 The Manager Translation** "Breaking down the dates to analyze performance by day of week and month."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** `dayofweek` starts at 0 (Monday) in Python. If you think 1 is Monday, you're gonna have a bad time. That's why we added `+ 1`.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** `dayofweek` starts at 0 (Monday) in Python. If you think 1 is Monday, you're gonna have a bad time. That's why we added `+ 1`.
 
 ### 🐍 Bellonda's Decoder: The History Book
 
-**1. The "Why are we doing this?"**
-Now we look at the older data (2010-2014) to see if the pattern holds up over time. Consistency = Predictability.
+**1. The "Why are we doing this?"** Now we look at the older data (2010-2014) to see if the pattern holds up over time. Consistency = Predictability.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `daily_agg.loc[...]` | **The Filter** | "Select rows based on a condition (Year between 2010 and 2014)." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `daily_agg.loc[...]` \| **The Filter** \| "Select rows based on a condition (Year between 2010 and 2014)." \|
 
-**3. 👔 The Manager Translation**
-"Reviewing historical trends."
+**3. 👔 The Manager Translation** "Reviewing historical trends."
 
 ```{python}
 # Extracting time components using the .dt accessor
@@ -210,26 +157,15 @@ daily_agg["dow"] = daily_agg["date"].dt.dayofweek + 1 # Day of Week (Mon=1, Sun=
 daily_agg["weekend"] = daily_agg["dow"].isin([6, 7])
 ```
 
-
-
 ### 🐍 Bellonda's Decoder: The Logic Gate (Complex Masks)
 
-**1. The "Why are we doing this?"**
-We need to flag specific days when schools are closed, because that affects swimming pool traffic. This isn't just "Summer"; it's a complex set of rules (Late May, August start, Winter break).
+**1. The "Why are we doing this?"** We need to flag specific days when schools are closed, because that affects swimming pool traffic. This isn't just "Summer"; it's a complex set of rules (Late May, August start, Winter break).
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `&` | **The AND** | "Both things must be true." |
-| `|` | **The OR** | "At least one thing must be true." |
-| `( ... )` | **The Guard Rails** | "CRITICAL. You MUST use parentheses to group logic, or Python gets confused." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `&` \| **The AND** \| "Both things must be true." \| \| `|` \| **The OR** \| "At least one thing must be true." \| \| `( ... )` \| **The Guard Rails** \| "CRITICAL. You MUST use parentheses to group logic, or Python gets confused." \|
 
-**3. 👔 The Manager Translation**
-"Identifying school holidays to adjust our forecasts."
+**3. 👔 The Manager Translation** "Identifying school holidays to adjust our forecasts."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** If you use the English words `and` / `or` here, Pandas will crash. You MUST use the bitwise operators `&` / `|`.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** If you use the English words `and` / `or` here, Pandas will crash. You MUST use the bitwise operators `&` / `|`.
 
 ```{python}
 # Creating the "School Off" mask using Bitwise Logic (&, |)
@@ -244,16 +180,11 @@ daily_agg["school_off"] = (
 
 ### 🐍 Bellonda's Decoder: The Arrow of Time
 
-**1. The "Why are we doing this?"**
-Time usually moves forward (unless you are a Time Lord). We create a simple counter (`1, 2, 3...`) to represent this linear progression, which helps models capture "Growth" over time.
+**1. The "Why are we doing this?"** Time usually moves forward (unless you are a Time Lord). We create a simple counter (`1, 2, 3...`) to represent this linear progression, which helps models capture "Growth" over time.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.index + 1` | **The Counter** | "Use the row numbers as a proxy for time." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.index + 1` \| **The Counter** \| "Use the row numbers as a proxy for time." \|
 
-**3. 👔 The Manager Translation**
-"Adding a trend line to see if sales are generally going up or down."
+**3. 👔 The Manager Translation** "Adding a trend line to see if sales are generally going up or down."
 
 ```{python}
 # Creating a simple linear trend for time
@@ -264,23 +195,13 @@ daily_agg["trend"] = daily_agg.index + 1
 # Get holiday calendar ----------------------------------
 ```
 
-
-
-```{python}
-
 ### 🐍 Bellonda's Decoder: Cheating with External Data
 
-**1. The "Why are we doing this?"**
-The swimming pool is closed on holidays. We *could* type out every holiday manually, but that's dumb. we use a library (`pandas_market_calendars`) to pull the NYSE holiday list. If the bankers are off, the kids are swimming.
+**1. The "Why are we doing this?"** The swimming pool is closed on holidays. We *could* type out every holiday manually, but that's dumb. we use a library (`pandas_market_calendars`) to pull the NYSE holiday list. If the bankers are off, the kids are swimming.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `mcal.get_calendar("NYSE")` | **The Source** | "Download the Wall Street schedule." |
-| `.isin(holidays)` | **The Cross-ref** | "Check if our dates appear in that holiday list." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `mcal.get_calendar("NYSE")` \| **The Source** \| "Download the Wall Street schedule." \| \| `.isin(holidays)` \| **The Cross-ref** \| "Check if our dates appear in that holiday list." \|
 
-**3. 👔 The Manager Translation**
-"Integrating public holiday data to account for closures."
+**3. 👔 The Manager Translation** "Integrating public holiday data to account for closures."
 
 ```{python}
 nyse = mcal.get_calendar("NYSE")
@@ -292,83 +213,59 @@ daily_agg["isHoliday"] = daily_agg["date"].isin(holidays)
 
 ### 🐍 Bellonda's Decoder: The 10,000 Foot View
 
-**1. The "Why are we doing this?"**
-Before we build fancy models, we look at the basic stats. Averages, max, min. If the max ticket sales is 1 million, we know something is wrong.
+**1. The "Why are we doing this?"** Before we build fancy models, we look at the basic stats. Averages, max, min. If the max ticket sales is 1 million, we know something is wrong.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.describe()` | **The Summary** | "Calculate count, mean, std, min, max for every column." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.describe()` \| **The Summary** \| "Calculate count, mean, std, min, max for every column." \|
 
-**3. 👔 The Manager Translation**
-"Checking the summary statistics."
+**3. 👔 The Manager Translation** "Checking the summary statistics."
 
 ```{python}
 # A quick glance at the numerical summaries (Distribution Check)
 daily_agg.describe()
 ```
 
-
-
 ### Define vars for analysis
 
 ### 🐍 Bellonda's Decoder: The Broadcaster (Transform)
 
-**1. The "Why are we doing this?"**
-This is a pro move. We want to know the *average* sales for "January" but we want to stick that number next to *every single day* in January. This allows us to compare "Today" vs "Typical Day".
+**1. The "Why are we doing this?"** This is a pro move. We want to know the *average* sales for "January" but we want to stick that number next to *every single day* in January. This allows us to compare "Today" vs "Typical Day".
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.groupby("month")` | **The Buckets** | "Put all Januaries in one bucket, all Februaries in another." |
-| `.transform("mean")` | **The Broadcaster** | "Calculate the mean for the bucket, then *broadcast* it back to every original row." |
-| `np.log()` | **The Squasher** | "Compress large numbers to reduce the effect of massive outliers." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.groupby("month")` \| **The Buckets** \| "Put all Januaries in one bucket, all Februaries in another." \| \| `.transform("mean")` \| **The Broadcaster** \| "Calculate the mean for the bucket, then *broadcast* it back to every original row." \| \| `np.log()` \| **The Squasher** \| "Compress large numbers to reduce the effect of massive outliers." \|
 
-**3. 👔 The Manager Translation**
-"Calculating seasonal baselines (monthly and weekly patterns)."
+**3. 👔 The Manager Translation** "Calculating seasonal baselines (monthly and weekly patterns)."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** standard `.mean()` shrinks your data to 12 rows. `.transform("mean")` keeps it at N rows. Use the right one!
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** standard `.mean()` shrinks your data to 12 rows. `.transform("mean")` keeps it at N rows. Use the right one!
 
 ```{python}
 # 1. Monthly Seasonality (Mean Quantity per Month)
-daily_agg["q_month"] = daily_agg.groupby("month")["QUANTITY"].transform("mean")
+daily_agg['q_month'] = daily_agg.groupby('month')['QUANTITY'].transform('mean')
 
 # 2. Log Transformation (Stabilizing the Variance)
-daily_agg["q_ln"] = np.log(daily_agg["QUANTITY"])
+daily_agg['q_ln'] = np.log(daily_agg['QUANTITY'])
 
 # Handling the Void (Inf/-Inf): Replace infinite values with NaN so they don't break the model
-daily_agg["q_ln"] = daily_agg["q_ln"].replace([np.inf, -np.inf], np.nan)
+daily_agg['q_ln'] = daily_agg['q_ln'].replace([np.inf, -np.inf], np.nan)
 
 # 3. Weekly Seasonality within Months (Mean Quantity per Month-DayOfWeek combination)
-daily_agg["tickets"] = daily_agg.groupby(["month", "dow"])["QUANTITY"].transform("mean")
+daily_agg['tickets'] = daily_agg.groupby(['month', 'dow'])['QUANTITY'].transform('mean')
 
 # 4. Log Version of Weekly Seasonality
-daily_agg["tickets_ln"] = daily_agg.groupby(["month", "dow"])["q_ln"].transform("mean")
+daily_agg['tickets_ln'] = daily_agg.groupby(['month', 'dow'])['q_ln'].transform('mean')
 
 # 5. Abbreviations for visualization (e.g., 'Mon', 'Jan')
-daily_agg["dow_abb"] = daily_agg["date"].dt.day_name().str[:3]
-daily_agg["month_abb"] = daily_agg["date"].dt.month_name().str[:3]
+daily_agg['dow_abb'] = daily_agg['date'].dt.day_name().str[:3]
+daily_agg['month_abb'] = daily_agg['date'].dt.month_name().str[:3]
 ```
 
 ## Descriptive graphs
 
-
-
 ### 🐍 Bellonda's Decoder: The Microscope
 
-**1. The "Why are we doing this?"**
-If we plot all 5 years, it looks like a mess. We zoom in on one year (2015) to see the heartbeat of the business—the weekly cycles.
+**1. The "Why are we doing this?"** If we plot all 5 years, it looks like a mess. We zoom in on one year (2015) to see the heartbeat of the business—the weekly cycles.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `sns.lineplot()` | **The Artist** | "Draw a line connecting the dots." |
-| `plt.xticks()` | **The Labels** | "Force the X-axis to show readable dates instead of random numbers." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `sns.lineplot()` \| **The Artist** \| "Draw a line connecting the dots." \| \| `plt.xticks()` \| **The Labels** \| "Force the X-axis to show readable dates instead of random numbers." \|
 
-**3. 👔 The Manager Translation**
-"Visualizing the daily sales rhythm for 2015."
+**3. 👔 The Manager Translation** "Visualizing the daily sales rhythm for 2015."
 
 ```{python}
 # Focusing on a single year (2015) to see the daily rhythm
@@ -389,16 +286,11 @@ plt.show()
 
 ### 🐍 Bellonda's Decoder: The History Book
 
-**1. The "Why are we doing this?"**
-Now we look at the older data (2010-2014) to see if the pattern holds up over time. Consistency = Predictability.
+**1. The "Why are we doing this?"** Now we look at the older data (2010-2014) to see if the pattern holds up over time. Consistency = Predictability.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `daily_agg.loc[...]` | **The Filter** | "Select rows based on a condition (Year between 2010 and 2014)." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `daily_agg.loc[...]` \| **The Filter** \| "Select rows based on a condition (Year between 2010 and 2014)." \|
 
-**3. 👔 The Manager Translation**
-"Reviewing historical trends."
+**3. 👔 The Manager Translation** "Reviewing historical trends."
 
 ```{python}
 filtered_data = daily_agg.loc[
@@ -420,21 +312,13 @@ plt.ylabel("Daily ticket sales")
 plt.show()
 ```
 
-
-
 ### 🐍 Bellonda's Decoder: The Box of Truth
 
-**1. The "Why are we doing this?"**
-A line plot shows trends, but a Box Plot shows *variability*. We want to see: Are sales consistent in June, or do they fluctuate wildly?
+**1. The "Why are we doing this?"** A line plot shows trends, but a Box Plot shows *variability*. We want to see: Are sales consistent in June, or do they fluctuate wildly?
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `sns.boxplot()` | **The Chart** | "Draw the distribution (Median, Quartiles, Outliers)." |
-| `fliersize` | **The Diamonds** | "How big should the outlier dots be?" |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `sns.boxplot()` \| **The Chart** \| "Draw the distribution (Median, Quartiles, Outliers)." \| \| `fliersize` \| **The Diamonds** \| "How big should the outlier dots be?" \|
 
-**3. 👔 The Manager Translation**
-"Analyzing monthly sales volatility."
+**3. 👔 The Manager Translation** "Analyzing monthly sales volatility."
 
 ```{python}
 # Defining the Order: We force the months to align with the calendar, not the alphabet
@@ -469,16 +353,11 @@ plt.show()
 
 ### 🐍 Bellonda's Decoder: The Weekly Grind
 
-**1. The "Why are we doing this?"**
-Same as above, but for Days of the Week. Is Monday dead? Is Sunday crazy? This confirms our weekly seasonality assumption.
+**1. The "Why are we doing this?"** Same as above, but for Days of the Week. Is Monday dead? Is Sunday crazy? This confirms our weekly seasonality assumption.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `order=dow_order` | **The Sorter** | "Force the days to appear Mon->Sun, not alphabetically (Fri->Mon)." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `order=dow_order` \| **The Sorter** \| "Force the days to appear Mon-\>Sun, not alphabetically (Fri-\>Mon)." \|
 
-**3. 👔 The Manager Translation**
-"Analyzing weekly sales volatility."
+**3. 👔 The Manager Translation** "Analyzing weekly sales volatility."
 
 ```{python}
 # Defining the Order of Days (Monday first!)
@@ -508,26 +387,15 @@ plt.grid(axis="x", color="gray", linestyle="-", linewidth=0.5)
 plt.show()
 ```
 
-
-
 ### 🐍 Bellonda's Decoder: Thermal Vision
 
-**1. The "Why are we doing this?"**
-We want to see the interaction between Month and Day. Are Sundays in July hotter than Sundays in December? A heatmap visualizes this 2D grid instantly.
+**1. The "Why are we doing this?"** We want to see the interaction between Month and Day. Are Sundays in July hotter than Sundays in December? A heatmap visualizes this 2D grid instantly.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `pd.Categorical(ordered=True)` | **The Enforcer** | "Tell Python that 'January' comes before 'February', logically." |
-| `.pivot()` | **The Matrix** | "Reshape data so Rows=Month, Columns=Day, Values=Sales." |
-| `sns.heatmap()` | **The IR Goggles** | "Color the cells based on value (Dark=Low, Light=High)." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `pd.Categorical(ordered=True)` \| **The Enforcer** \| "Tell Python that 'January' comes before 'February', logically." \| \| `.pivot()` \| **The Matrix** \| "Reshape data so Rows=Month, Columns=Day, Values=Sales." \| \| `sns.heatmap()` \| **The IR Goggles** \| "Color the cells based on value (Dark=Low, Light=High)." \|
 
-**3. 👔 The Manager Translation**
-" identifying high-traffic hotspots."
+**3. 👔 The Manager Translation** " identifying high-traffic hotspots."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** If you don't use `ordered=True`, your heatmap axis will be alphabetical (Apr, Aug, Dec...) which makes the seasonality impossible to read.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** If you don't use `ordered=True`, your heatmap axis will be alphabetical (Apr, Aug, Dec...) which makes the seasonality impossible to read.
 
 ```{python}
 # to check for interactions, look at the heatmap
@@ -575,11 +443,9 @@ plt.show()
 
 ### 🐍 Bellonda's Decoder: Thermal Vision (Log Scale)
 
-**1. The "Why are we doing this?"**
-Same heatmap, but using Log-sales. This dampens the extreme peaks and lets us see differences in the "quiet" months more clearly.
+**1. The "Why are we doing this?"** Same heatmap, but using Log-sales. This dampens the extreme peaks and lets us see differences in the "quiet" months more clearly.
 
-**3. 👔 The Manager Translation**
-"Same analysis, adjusted for scale."
+**3. 👔 The Manager Translation** "Same analysis, adjusted for scale."
 
 ```{python}
 # not in book
@@ -615,26 +481,15 @@ plt.show()
 
 ### Creat train/holdout data
 
-
-
 ### 🐍 Bellonda's Decoder: The Time Travel Ban
 
-**1. The "Why are we doing this?"**
-We need to test our model. In normal Machine Learning, we shuffle the data randomly. In Time Series, **WE DO NOT SHUFFLE**. Because if you train on data from tomorrow to predict yesterday, you are cheating. It's called "Look-ahead Bias".
+**1. The "Why are we doing this?"** We need to test our model. In normal Machine Learning, we shuffle the data randomly. In Time Series, **WE DO NOT SHUFFLE**. Because if you train on data from tomorrow to predict yesterday, you are cheating. It's called "Look-ahead Bias".
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `factor_cols` | **The Prep** | "Convert these columns to Categories (Factors) so the model treats them as groups, not numbers." |
-| `.loc[year < 2016]` | **The Split** | "Keep everything BEFORE 2016 for training." |
-| `.loc[year == 2016]` | **The Holdout** | "Keep 2016 locked away in a vault. We only touch this ONCE at the very end." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `factor_cols` \| **The Prep** \| "Convert these columns to Categories (Factors) so the model treats them as groups, not numbers." \| \| `.loc[year < 2016]` \| **The Split** \| "Keep everything BEFORE 2016 for training." \| \| `.loc[year == 2016]` \| **The Holdout** \| "Keep 2016 locked away in a vault. We only touch this ONCE at the very end." \|
 
-**3. 👔 The Manager Translation**
-"Splitting data into 'Past' (Training) and 'Future' (Testing) to simulate a real-world scenario."
+**3. 👔 The Manager Translation** "Splitting data into 'Past' (Training) and 'Future' (Testing) to simulate a real-world scenario."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** If you use `train_test_split(shuffle=True)`, your boss will fire you for delivering impossible accuracy.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** If you use `train_test_split(shuffle=True)`, your boss will fire you for delivering impossible accuracy.
 
 ```{python}
 # 1. Preparing the Factor columns (Categories)
@@ -648,22 +503,13 @@ data_holdout = daily_agg.loc[daily_agg["year"] == 2016, :]
 data_train = daily_agg.loc[daily_agg["year"] < 2016, :]
 ```
 
-
-
 ### 🐍 Bellonda's Decoder: The Custom Gauntlet (Rolling CV)
 
-**1. The "Why are we doing this?"**
-Standard Cross-Validation functions are dumb about time. We need to build a custom loop that respects history. We train on Years A, B, C, D to predict Year E. Then we rotate.
+**1. The "Why are we doing this?"** Standard Cross-Validation functions are dumb about time. We need to build a custom loop that respects history. We train on Years A, B, C, D to predict Year E. Then we rotate.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `def function_name(...):` | **The Blueprint** | "We are creating a reusable tool." |
-| `yield` or `append` | **The Collection** | "Store the score for this year, then move to the next." |
-| `correct_log_...` | **The Math Hack** | "If we predicted log-sales, convert them back to real-sales so the boss understands the error." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `def function_name(...):` \| **The Blueprint** \| "We are creating a reusable tool." \| \| `yield` or `append` \| **The Collection** \| "Store the score for this year, then move to the next." \| \| `correct_log_...` \| **The Math Hack** \| "If we predicted log-sales, convert them back to real-sales so the boss understands the error." \|
 
-**3. 👔 The Manager Translation**
-"Stress-testing the model across different historical years to ensure reliability."
+**3. 👔 The Manager Translation** "Stress-testing the model across different historical years to ensure reliability."
 
 ```{python}
 # Frieren: A custom spell to iterate through time periods
@@ -721,17 +567,11 @@ def inserted_test_set_cv(
 
 ### 🐍 Bellonda's Decoder: The Formula Book
 
-**1. The "Why are we doing this?"**
-We don't know which combination of variables works best. So we define 5 candidates, ranging from "Stupid Simple" (Model 1) to "Galaxy Brain" (Model 5).
+**1. The "Why are we doing this?"** We don't know which combination of variables works best. So we define 5 candidates, ranging from "Stupid Simple" (Model 1) to "Galaxy Brain" (Model 5).
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `"y ~ x1 + x2"` | **The Recipe** | "Predict Y using ingredients X1 and X2." |
-| `*` (e.g., `school_off*dow`) | **The Interaction** | "Check if 'School Off' has a *different* impact on Mondays vs Fridays." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `"y ~ x1 + x2"` \| **The Recipe** \| "Predict Y using ingredients X1 and X2." \| \| `*` (e.g., `school_off*dow`) \| **The Interaction** \| "Check if 'School Off' has a *different* impact on Mondays vs Fridays." \|
 
-**3. 👔 The Manager Translation**
-"Hypothesizing different drivers of sales (Holidays vs Trends vs Seasonality)."
+**3. 👔 The Manager Translation** "Hypothesizing different drivers of sales (Holidays vs Trends vs Seasonality)."
 
 ```{python}
 # ---------------------------------------------------------
@@ -758,17 +598,11 @@ model5 = "QUANTITY ~ trend + month + dow + isHoliday + school_off*dow + weekend*
 
 ### 🐍 Bellonda's Decoder: The Tournament
 
-**1. The "Why are we doing this?"**
-We have 5 gladiators (Models). We throw them into the arena (The Cross-Validation Loop). Only one survives.
+**1. The "Why are we doing this?"** We have 5 gladiators (Models). We throw them into the arena (The Cross-Validation Loop). Only one survives.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `for model in [...]` | **The Loop** | "Execute the test for every candidate." |
-| `cross_validated_rmses.append()` | **The Scoreboard** | "Write down the error score." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `for model in [...]` \| **The Loop** \| "Execute the test for every candidate." \| \| `cross_validated_rmses.append()` \| **The Scoreboard** \| "Write down the error score." \|
 
-**3. 👔 The Manager Translation**
-"Benchmarking our models against each other."
+**3. 👔 The Manager Translation** "Benchmarking our models against each other."
 
 ```{python}
 # The Evaluation Ritual: Testing each spell against the flow of time
@@ -782,17 +616,11 @@ for model in [model1, model2, model3, model4, model5]:
 
 ### 🐍 Bellonda's Decoder: The Logarithmic Twist
 
-**1. The "Why are we doing this?"**
-Ticket sales can't be negative, and they might grow exponentially. A linear model assumes straight lines. By taking the `log()` of sales, we make the curve straight, fit the model, and then bend it back at the end.
+**1. The "Why are we doing this?"** Ticket sales can't be negative, and they might grow exponentially. A linear model assumes straight lines. By taking the `log()` of sales, we make the curve straight, fit the model, and then bend it back at the end.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `q_ln ~ ...` | **The Target** | "Predict the Log-Quantity, not the Quantity." |
-| `correct_log...=True` | **The Fix** | "Apply the special math correction when converting back." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `q_ln ~ ...` \| **The Target** \| "Predict the Log-Quantity, not the Quantity." \| \| `correct_log...=True` \| **The Fix** \| "Apply the special math correction when converting back." \|
 
-**3. 👔 The Manager Translation**
-"Testing a specialized model for exponential growth."
+**3. 👔 The Manager Translation** "Testing a specialized model for exponential growth."
 
 ```{python}
 # Model 6: The Logarithmic Alteration
@@ -810,30 +638,19 @@ cross_validated_rmses.append(rmse6)
 
 ### 🐍 Bellonda's Decoder: Summoning the Oracle (Prophet)
 
-**1. The "Why are we doing this?"**
-Facebook built a forecasting tool called Prophet. It's famous. We are importing it to see if Zuckerberg's AI is smarter than our simple regression.
+**1. The "Why are we doing this?"** Facebook built a forecasting tool called Prophet. It's famous. We are importing it to see if Zuckerberg's AI is smarter than our simple regression.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `Prophet()` | **The Factory** | "Create a new forecasting engine." |
-| `yearly_seasonality='auto'` | **The Autopilot** | "Figure out the patterns yourself, robot." |
-| `add_country_holidays` | **The Cheat Code** | "Automatically look up US holidays." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `Prophet()` \| **The Factory** \| "Create a new forecasting engine." \| \| `yearly_seasonality='auto'` \| **The Autopilot** \| "Figure out the patterns yourself, robot." \| \| `add_country_holidays` \| **The Cheat Code** \| "Automatically look up US holidays." \|
 
-**3. 👔 The Manager Translation**
-"Comparing our custom model against an industry-standard AI tool."
+**3. 👔 The Manager Translation** "Comparing our custom model against an industry-standard AI tool."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** Prophet is strict. You MUST rename your columns to `ds` (Date) and `y` (Value), or it will error out.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** Prophet is strict. You MUST rename your columns to `ds` (Date) and `y` (Value), or it will error out.
 
 ```{python}
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
 from prophet.diagnostics import performance_metrics
 ```
-
-
 
 ```{python}
 # Frieren: Initializing the Oracle. Note 'additive' seasonality.
@@ -851,17 +668,11 @@ model_prophet = Prophet.add_country_holidays(model_prophet, "US")
 
 ### 🐍 Bellonda's Decoder: Training the Oracle
 
-**1. The "Why are we doing this?"**
-We have to feed the data to Prophet. It's a hungry beast.
+**1. The "Why are we doing this?"** We have to feed the data to Prophet. It's a hungry beast.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.rename()` | **The Uniform** | "Put on the 'ds' and 'y' name tags so Prophet recognizes you." |
-| `.fit()` | **The Learning** | "Analyze the history." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.rename()` \| **The Uniform** \| "Put on the 'ds' and 'y' name tags so Prophet recognizes you." \| \| `.fit()` \| **The Learning** \| "Analyze the history." \|
 
-**3. 👔 The Manager Translation**
-"Training the AI model."
+**3. 👔 The Manager Translation** "Training the AI model."
 
 ```{python}
 # Fitting the Oracle to the Past
@@ -874,17 +685,11 @@ model_prophet = Prophet.fit(
 
 ### 🐍 Bellonda's Decoder: The Oracle's Test
 
-**1. The "Why are we doing this?"**
-Prophet has its own way of doing cross-validation. It simulates "standing in the past" and forecasting forward.
+**1. The "Why are we doing this?"** Prophet has its own way of doing cross-validation. It simulates "standing in the past" and forecasting forward.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `initial='365 days'` | **The Start** | "Train on year 1." |
-| `horizon='365 days'` | **The Goal** | "Predict year 2." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `initial='365 days'` \| **The Start** \| "Train on year 1." \| \| `horizon='365 days'` \| **The Goal** \| "Predict year 2." \|
 
-**3. 👔 The Manager Translation**
-"Backtesting the AI performance."
+**3. 👔 The Manager Translation** "Backtesting the AI performance."
 
 ```{python}
 # Generating the Cross-Validation folds (Temporal Backtesting)
@@ -898,16 +703,11 @@ cv_pred = cross_validation(
 
 ### 🐍 Bellonda's Decoder: Grading the Oracle
 
-**1. The "Why are we doing this?"**
-Prophet spits out a complex table. We just want one number: The RMSE (Error score).
+**1. The "Why are we doing this?"** Prophet spits out a complex table. We just want one number: The RMSE (Error score).
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `performance_metrics` | **The Grader** | "Calculate accuracy scores." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `performance_metrics` \| **The Grader** \| "Calculate accuracy scores." \|
 
-**3. 👔 The Manager Translation**
-"Getting the final score for the AI model."
+**3. 👔 The Manager Translation** "Getting the final score for the AI model."
 
 ```{python}
 # Extracting the RMSE from the Oracle's visions
@@ -917,16 +717,11 @@ cross_validated_rmses.append(rmse_prophet_cv)
 
 ### 🐍 Bellonda's Decoder: The Scoreboard
 
-**1. The "Why are we doing this?"**
-We have 7 candidates now (5 Linear, 1 Log, 1 Prophet). Who won? Lowest RMSE takes the crown.
+**1. The "Why are we doing this?"** We have 7 candidates now (5 Linear, 1 Log, 1 Prophet). Who won? Lowest RMSE takes the crown.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `pd.DataFrame()` | **The Report** | "Make a nice table of the results." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `pd.DataFrame()` \| **The Report** \| "Make a nice table of the results." \|
 
-**3. 👔 The Manager Translation**
-"Final model selection based on accuracy."
+**3. 👔 The Manager Translation** "Final model selection based on accuracy."
 
 ```{python}
 # Note: M6 log model rmse is slightly different from book
@@ -939,21 +734,13 @@ pd.DataFrame(
 
 ## Evaluate best model on holdout set
 
-
-
 ### 🐍 Bellonda's Decoder: The Final Exam
 
-**1. The "Why are we doing this?"**
-We picked a winner (Model 5). Now, for the first time ever, we introduce it to 2016 (Holdout Data). This is the true test of real-world performance.
+**1. The "Why are we doing this?"** We picked a winner (Model 5). Now, for the first time ever, we introduce it to 2016 (Holdout Data). This is the true test of real-world performance.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.predict(data_holdout)` | **The Forecast** | "Generate predictions for the future." |
-| `root_mean_squared_error` | **The Grade** | "How far off were we?" |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.predict(data_holdout)` \| **The Forecast** \| "Generate predictions for the future." \| \| `root_mean_squared_error` \| **The Grade** \| "How far off were we?" \|
 
-**3. 👔 The Manager Translation**
-"Confirming model reliability on fresh data before deployment."
+**3. 👔 The Manager Translation** "Confirming model reliability on fresh data before deployment."
 
 ```{python}
 best_model = pf.feols(model5, data=data_train)
@@ -970,17 +757,11 @@ rmse_holdout_best
 
 ### 🐍 Bellonda's Decoder: The Report Card
 
-**1. The "Why are we doing this?"**
-A single error number hides details. Did we fail in August? Did we nail December? We group the error by month to find weak spots.
+**1. The "Why are we doing this?"** A single error number hides details. Did we fail in August? Did we nail December? We group the error by month to find weak spots.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.groupby("month")` | **The Slice** | "Analyze performance month-by-month." |
-| `lambda x: ...` | **The Mini-Function** | "A throwaway function to calculate RMSE for each group." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.groupby("month")` \| **The Slice** \| "Analyze performance month-by-month." \| \| `lambda x: ...` \| **The Mini-Function** \| "A throwaway function to calculate RMSE for each group." \|
 
-**3. 👔 The Manager Translation**
-"Diagnosing monthly forecast accuracy."
+**3. 👔 The Manager Translation** "Diagnosing monthly forecast accuracy."
 
 ```{python}
 # graph relative RMSE (on holdout) per month
@@ -1004,16 +785,11 @@ rmse_monthly = pd.DataFrame(
 
 ### 🐍 Bellonda's Decoder: Visualizing Failure
 
-**1. The "Why are we doing this?"**
-We plot the monthly error bars. If one bar is huge, our model sucks at that time of year.
+**1. The "Why are we doing this?"** We plot the monthly error bars. If one bar is huge, our model sucks at that time of year.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `sns.barplot` | **The Chart** | "Draw error bars." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `sns.barplot` \| **The Chart** \| "Draw error bars." \|
 
-**3. 👔 The Manager Translation**
-"Visualizing accuracy by season."
+**3. 👔 The Manager Translation** "Visualizing accuracy by season."
 
 ```{python}
 ax = sns.barplot(x="date", y="RMSE_norm", data=rmse_monthly)
@@ -1025,28 +801,15 @@ plt.grid(axis="x", color="gray", linestyle="-", linewidth=0.5)
 plt.show()
 ```
 
-
-
 ### 🐍 Bellonda's Decoder: The Shape Shifter (Melt)
 
-**1. The "Why are we doing this?"**
-Our data is lazy: it has one column for "Actual" and one for "Predicted".
-But Seaborn (the plotter) demands "Long Data". It wants one column called "Value" and another called "Type" (Actual/Predicted).
-We `melt` the table to reshape it.
+**1. The "Why are we doing this?"** Our data is lazy: it has one column for "Actual" and one for "Predicted". But Seaborn (the plotter) demands "Long Data". It wants one column called "Value" and another called "Type" (Actual/Predicted). We `melt` the table to reshape it.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `.melt()` | **The Liquefier** | "Dissolve multiple columns into rows." |
-| `.merge()` | **The Stitch** | "Glue the original data back on so we don't lose context." |
-| `.assign()` | **The Label Maker** | "Add a new column with pretty names for the legend." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `.melt()` \| **The Liquefier** \| "Dissolve multiple columns into rows." \| \| `.merge()` \| **The Stitch** \| "Glue the original data back on so we don't lose context." \| \| `.assign()` \| **The Label Maker** \| "Add a new column with pretty names for the legend." \|
 
-**3. 👔 The Manager Translation**
-"Formatting data for the final dashboard."
+**3. 👔 The Manager Translation** "Formatting data for the final dashboard."
 
-**4. 🍌 The Banana Peel (Watch Out!)**
-> [!WARNING]
-> **Don't slip here:** This chain of functions is a beast. If you miss one parenthesis, the whole thing breaks. Indentation is key.
+**4. 🍌 The Banana Peel (Watch Out!)** \> \[!WARNING\] \> **Don't slip here:** This chain of functions is a beast. If you miss one parenthesis, the whole thing breaks. Indentation is key.
 
 ```{python}
 # Frieren: Reshaping the timeline into a long format for the Sea-born Plotter (Seaborn)
@@ -1071,16 +834,11 @@ plotdata = (
 
 ### 🐍 Bellonda's Decoder: The Moment of Truth
 
-**1. The "Why are we doing this?"**
-The Final Chart. Actual Sales (Blue) vs Predicted Sales (Orange). If the lines overlap perfectly, we are wizards.
+**1. The "Why are we doing this?"** The Final Chart. Actual Sales (Blue) vs Predicted Sales (Orange). If the lines overlap perfectly, we are wizards.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `hue="variable"` | **The Color** | "Color lines differently based on if they are 'Actual' or 'Predicted'." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `hue="variable"` \| **The Color** \| "Color lines differently based on if they are 'Actual' or 'Predicted'." \|
 
-**3. 👔 The Manager Translation**
-"The final forecast dashboard."
+**3. 👔 The Manager Translation** "The final forecast dashboard."
 
 ```{python}
 sns.lineplot(x="date", y="value", hue="variable", style="variable", data=plotdata)
@@ -1101,16 +859,11 @@ plt.show()
 
 ### 🐍 Bellonda's Decoder: The Microscope (Again)
 
-**1. The "Why are we doing this?"**
-The year-long chart is crowded. We zoom in on August to check the daily fit.
+**1. The "Why are we doing this?"** The year-long chart is crowded. We zoom in on August to check the daily fit.
 
-**2. Syntax Autopsy (The Python)**
-| Code Fragment | The Role | The Translation |
-| :--- | :--- | :--- |
-| `[plotdata["month"] == 8]` | **The Filter** | "Show me August." |
+**2. Syntax Autopsy (The Python)** \| Code Fragment \| The Role \| The Translation \| \| :--- \| :--- \| :--- \| \| `[plotdata["month"] == 8]` \| **The Filter** \| "Show me August." \|
 
-**3. 👔 The Manager Translation**
-"Detailed inspection of peak season performance."
+**3. 👔 The Manager Translation** "Detailed inspection of peak season performance."
 
 ```{python}
 # Frieren: Focusing the mage sight on a single month (August) to inspect the fine details.
@@ -1152,8 +905,9 @@ plt.show()
 # 🎓 The Senior Syntax Checklist
 
 ## 🛠️ Tools Mastery
+
 | Method/Library | What it *actually* does | Generic Syntax Template |
-| :--- | :--- | :--- |
+|:-----------------------|:-----------------------|:-----------------------|
 | `pd.read_csv(parse_dates=...)` | Time-travel loader | `pd.read_csv('file.csv', parse_dates=['col'])` |
 | `.dt.property` | Time extraction | `df['date'].dt.month` |
 | `(A) & (B)` | Safe logic gates | `(df['A'] > 1) & (df['B'] < 5)` |
@@ -1161,8 +915,9 @@ plt.show()
 | `.melt()` | Reshaping for plots | `df.melt(id_vars=['id'], value_vars=['A', 'B'])` |
 
 ## 👶 ELI5 Syntax Appendix (The "Explain Like I'm 5" Dictionary)
+
 | Term | ELI5 Analogy | Minimal Example |
-| :--- | :--- | :--- |
+|:-----------------------|:-----------------------|:-----------------------|
 | `pd.DataFrame` | It's an Excel sheet that lives inside your computer's RAM. | `df = pd.DataFrame({"A": [1, 2]})` |
 | `.groupby()` | Like sorting a deck of cards into piles by suit (Hearts, Spades). | `df.groupby("suit")` |
 | `.transform("mean")` | Asking the dealer the average card value for each suit, then writing that number on *every* card of that suit. | `df.groupby("suit")["val"].transform("mean")` |
@@ -1173,7 +928,5 @@ plt.show()
 | `Boolean Mask` | A filter. Like sieve. We keep "True" rows and throw away "False" rows. | `mask = df["age"] > 18` |
 
 ## 🧠 Bellonda's Final Thought
+
 "You survived the Time-Series Gauntlet. Most people quit after the `melt` function. You didn't. Go get a coffee."
-
-
-
